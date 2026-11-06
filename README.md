@@ -20,8 +20,11 @@ Instead of trusting probabilistic AI models with raw payment tokens or credit ca
 
 ### System Architecture Diagram
 
-![SafeAgent Complete System Architecture](assets/architecture-diagram.png)
-*Visual architecture mapping component interactions across User Console (P1), Shopping Agent (P2), Policy Gateway (P3), and PayPal Settlement (P4) ([gitdiagram.com/hemanya1251070718/safeagent-paypal](https://gitdiagram.com/hemanya1251070718/safeagent-paypal)).*
+<p align="center">
+  <img src="assets/architecture-diagram.svg" width="100%" alt="SafeAgent Complete System Architecture" />
+</p>
+
+*Crystal-clear vector architecture mapping component interactions across User Console (P1), Shopping Agent (P2), Policy Gateway (P3), and PayPal Settlement (P4) ([gitdiagram.com/hemanya1251070718/safeagent-paypal](https://gitdiagram.com/hemanya1251070718/safeagent-paypal)).*
 
 ---
 
