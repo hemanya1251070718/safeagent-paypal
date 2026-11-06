@@ -1,0 +1,256 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "SafeAgent Cognitive Commerce & MCP Tools API",
+    "version": "1.0.0",
+    "description": "Deterministic, policy-guarded financial proxy and autonomous shopping planner for the PayPal AI Hackathon: 'Build What's Next with PayPal and AI'. Enables untrusted LLMs to discover products, compute sales taxes, and construct non-repudiable checkout intents without accessing payment credentials.",
+    "contact": {
+      "name": "SafeAgent Team",
+      "url": "https://github.com/hemanya1251070718/safeagent-paypal"
+    },
+    "license": {
+      "name": "Apache-2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:4001",
+      "description": "SafeAgent Cognitive Agent Microservice (P2)"
+    },
+    {
+      "url": "http://localhost:3000",
+      "description": "SafeAgent Policy Gateway (P3)"
+    }
+  ],
+  "paths": {
+    "/agent/plan": {
+      "post": {
+        "summary": "Execute Autonomous Shopping Plan",
+        "description": "Receives a high-level natural language shopping instruction and active spending mandate ID. Executes multi-step semantic discovery, cart validation, and intent dispatch with cognitive reasoning traces.",
+        "operationId": "planAndExecute",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Plan execution completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanExecutionResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/catalog": {
+      "get": {
+        "summary": "Search Merchant Catalogs",
+        "description": "Queries multi-merchant inventory using hybrid keyword relevance and dense vector semantic embeddings (Google Gemini embedding-001 with TF-IDF fallback).",
+        "operationId": "searchCatalog",
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Search query or natural language description (e.g. 'cordless screen pointer')"
+          },
+          {
+            "name": "maxPrice",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "number" },
+            "description": "Maximum budget ceiling in USD"
+          },
+          {
+            "name": "merchant",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "Merchant whitelist filter (e.g. 'Shopify-TechStore')"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ranked product listings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogSearchResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/cart": {
+      "post": {
+        "summary": "Build Verified Shopping Cart",
+        "description": "Validates merchant stock, enforces single-merchant cart policies, and calculates deterministic sales tax (8%) and final order totals.",
+        "operationId": "buildCart",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BuildCartRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Calculated cart object",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/mcp": {
+      "get": {
+        "summary": "Model Context Protocol Tool Registry",
+        "description": "Returns JSON-RPC 2.0 tool definitions compatible with Anthropic MCP, Claude Desktop, and Gemini CLI agents.",
+        "operationId": "getMcpTools",
+        "responses": {
+          "200": {
+            "description": "MCP registered tool schemas"
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Microservice Health Check",
+        "responses": {
+          "200": {
+            "description": "Service is healthy and operational"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "PlanRequest": {
+        "type": "object",
+        "properties": {
+          "goal": { "type": "string", "example": "Buy me an ergonomic wireless mouse under $30" },
+          "mandateId": { "type": "string", "example": "mandate_active_001" }
+        },
+        "required": ["goal", "mandateId"]
+      },
+      "PlanExecutionResult": {
+        "type": "object",
+        "properties": {
+          "goal": { "type": "string" },
+          "mandateId": { "type": "string" },
+          "success": { "type": "boolean" },
+          "finalStatus": { "type": "string", "example": "ACCEPTED_AND_CAPTURED" },
+          "trace": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "step": { "type": "integer" },
+                "timestamp": { "type": "string" },
+                "type": { "type": "string", "enum": ["THOUGHT", "TOOL_CALL", "TOOL_RESULT", "GATEWAY_RESPONSE", "RECOVERY"] },
+                "content": { "type": "string" }
+              }
+            }
+          },
+          "intent": { "$ref": "#/components/schemas/CheckoutIntent" }
+        }
+      },
+      "CatalogSearchResponse": {
+        "type": "object",
+        "properties": {
+          "count": { "type": "integer" },
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "merchant": { "type": "string" },
+                "name": { "type": "string" },
+                "price": { "type": "number" },
+                "currency": { "type": "string" },
+                "inStock": { "type": "boolean" },
+                "matchType": { "type": "string" },
+                "relevanceScore": { "type": "number" }
+              }
+            }
+          }
+        }
+      },
+      "BuildCartRequest": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "productId": { "type": "string" },
+                "quantity": { "type": "integer", "minimum": 1 }
+              },
+              "required": ["productId", "quantity"]
+            }
+          },
+          "taxRatePercent": { "type": "number", "default": 8.0 }
+        },
+        "required": ["items"]
+      },
+      "CartResponse": {
+        "type": "object",
+        "properties": {
+          "cart": {
+            "type": "object",
+            "properties": {
+              "merchant": { "type": "string" },
+              "subtotal": { "type": "number" },
+              "tax": { "type": "number" },
+              "total": { "type": "number" },
+              "currency": { "type": "string" },
+              "items": { "type": "array", "items": { "type": "object" } }
+            }
+          }
+        }
+      },
+      "CheckoutIntent": {
+        "type": "object",
+        "properties": {
+          "intentId": { "type": "string" },
+          "mandateId": { "type": "string" },
+          "merchant": { "type": "string" },
+          "items": { "type": "array", "items": { "type": "object" } },
+          "subtotal": { "type": "number" },
+          "tax": { "type": "number" },
+          "total": { "type": "number" },
+          "currency": { "type": "string" },
+          "nonce": { "type": "string" },
+          "agentReasoning": { "type": "string" }
+        },
+        "required": ["intentId", "mandateId", "merchant", "items", "subtotal", "tax", "total", "currency", "nonce"]
+      }
+    }
+  }
+}

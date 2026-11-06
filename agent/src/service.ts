@@ -13,12 +13,32 @@ app.use(cors());
 app.use(express.json());
 
 // Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', service: 'SafeAgent Cognitive Agent (P2)' });
+});
+
 app.get('/agent/health', (req, res) => {
   res.json({
     status: 'healthy',
     service: 'SafeAgent Cognitive Agent (P2)',
     merchantsLoaded: storeService.listMerchants().length,
     productsLoaded: storeService.getAll().length
+  });
+});
+
+// MCP tools metadata endpoint for APIMatic & remote inspection
+app.get('/agent/mcp', (req, res) => {
+  res.json({
+    protocol: "model-context-protocol/1.0",
+    serverName: "SafeAgent-Commerce-MCP",
+    tools: [
+      { name: "search_products", description: "Search merchant catalogs using keyword relevance and Gemini semantic embeddings" },
+      { name: "get_product_details", description: "Retrieve complete specifications and inventory status" },
+      { name: "build_cart", description: "Calculate subtotal, 8% tax, and build verified cart" },
+      { name: "submit_intent", description: "Submit mandate-bound checkout intent to SafeAgent deterministic gateway" }
+    ],
+    resources: ["safeagent://catalog/products"],
+    prompts: ["autonomous-procurement"]
   });
 });
 

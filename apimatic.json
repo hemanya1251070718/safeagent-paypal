@@ -1,0 +1,33 @@
+{
+  "apimaticVersion": "3.0",
+  "project": {
+    "name": "SafeAgent-PayPal-AI-Hackathon",
+    "description": "Deterministic, policy-guarded financial proxy for autonomous AI agents built for the PayPal AI Hackathon: 'Build What's Next with PayPal and AI'.",
+    "version": "1.0.0"
+  },
+  "specifications": [
+    {
+      "path": "./agent/openapi.json",
+      "format": "OpenAPI3",
+      "default": true
+    }
+  ],
+  "environments": [
+    {
+      "name": "Local Development",
+      "servers": {
+        "agent": "http://localhost:4001",
+        "gateway": "http://localhost:3000",
+        "payments": "http://localhost:5000"
+      }
+    },
+    {
+      "name": "Render Production",
+      "servers": {
+        "gateway": "https://safeagent-gateway.onrender.com",
+        "payments": "https://safeagent-payments.onrender.com"
+      }
+    }
+  ],
+  "sponsorTarget": "APIMatic Sponsor Prize ($1,000)"
+}
