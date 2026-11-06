@@ -68,9 +68,10 @@ export class CognitivePlanner {
     const budgetMatch = lowerGoal.match(/(?:under|below|less than|within)\s*(?:₹|rs\.?|inr|\$)?\s*(\d+(?:,\d+)*(?:\.\d+)?)/);
     if (budgetMatch && budgetMatch[1]) {
       maxBudget = parseFloat(budgetMatch[1].replace(/,/g, ''));
+      query = goal.replace(/(?:under|below|less than|within)\s*(?:₹|rs\.?|inr|\$)?\s*(\d+(?:,\d+)*(?:\.\d+)?)/i, '').trim();
     }
 
-    log('TOOL_CALL', `Calling tool: search_products(query="${query}", maxPrice=${maxBudget ?? 'None'})`);
+    log('TOOL_CALL', `Calling tool: search_products(query="${query}", maxPrice=${maxBudget ? `₹${maxBudget}` : 'None'})`);
     const searchResult = await executeSearchProducts({ query, maxPrice: maxBudget });
     log('TOOL_RESULT', `Catalog returned ${searchResult.count} matching products.`, searchResult);
 
@@ -93,7 +94,8 @@ export class CognitivePlanner {
       };
     }
 
-    log('THOUGHT', `Selecting best matching item: "${chosenProduct.name}" from merchant "${chosenProduct.merchant}" at $${chosenProduct.price} ${chosenProduct.currency}.`);
+    const sym = chosenProduct.currency === 'INR' ? '₹' : '$';
+    log('THOUGHT', `Selecting best matching item: "${chosenProduct.name}" from merchant "${chosenProduct.merchant}" at ${sym}${chosenProduct.price.toLocaleString('en-IN')} ${chosenProduct.currency}.`);
     log('TOOL_CALL', `Calling tool: get_product_details(productId="${chosenProduct.id}")`);
     const details = await executeGetProductDetails({ productId: chosenProduct.id });
     log('TOOL_RESULT', `Retrieved full product specifications and inventory status.`, details);
@@ -102,9 +104,9 @@ export class CognitivePlanner {
     log('TOOL_CALL', `Calling tool: build_cart(items=[{productId: "${chosenProduct.id}", quantity: 1}])`);
     const cartResult = await executeBuildCart({
       items: [{ productId: chosenProduct.id, quantity: 1 }],
-      taxRatePercent: 8.0
+      taxRatePercent: 18.0
     });
-    log('TOOL_RESULT', `Cart successfully composed: Subtotal=$${cartResult.cart?.subtotal}, Tax=$${cartResult.cart?.tax}, Total=$${cartResult.cart?.total}.`, cartResult);
+    log('TOOL_RESULT', `Cart successfully composed: Subtotal=₹${cartResult.cart?.subtotal?.toLocaleString('en-IN')}, 18% GST=₹${cartResult.cart?.tax?.toLocaleString('en-IN')}, Total=₹${cartResult.cart?.total?.toLocaleString('en-IN')} INR.`, cartResult);
 
     if (!cartResult.cart) {
       return {
@@ -117,8 +119,8 @@ export class CognitivePlanner {
     }
 
     // Step 4: Submit Intent to Policy Gateway
-    const reasoningText = `Selected '${chosenProduct.name}' ($${chosenProduct.price}) to fulfill user request '${goal}'. Total with tax is $${cartResult.cart.total}.`;
-    log('TOOL_CALL', `Calling tool: submit_intent(mandateId="${mandateId}", merchant="${cartResult.cart.merchant}", total=$${cartResult.cart.total})`);
+    const reasoningText = `Selected '${chosenProduct.name}' (₹${chosenProduct.price}) to fulfill user request '${goal}'. Total with 18% GST is ₹${cartResult.cart.total}.`;
+    log('TOOL_CALL', `Calling tool: submit_intent(mandateId="${mandateId}", merchant="${cartResult.cart.merchant}", total=₹${cartResult.cart.total.toLocaleString('en-IN')})`);
     
     let submission = await executeSubmitIntent({
       mandateId,

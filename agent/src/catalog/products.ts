@@ -42,7 +42,7 @@ export const CATALOG: MerchantProduct[] = [
     price: 2199,
     currency: "INR",
     inStock: true,
-    description: "Ultra-compact high-speed USB-C wall charger with PowerIQ 3.0 for laptops and phones.",
+    description: "Ultra-compact high-speed USB-C wall charger with PowerIQ 3.0 for mobile devices and laptops.",
     tags: ["charger", "usb-c", "anker", "fast-charging"]
   },
   {
@@ -112,6 +112,28 @@ export const CATALOG: MerchantProduct[] = [
     inStock: true,
     description: "Next-gen flagship smartphone with A19 Pro Bionic, ProMotion Super Retina XDR OLED, and 48MP Telephoto.",
     tags: ["iphone", "apple", "phone", "smartphone", "pro-max", "flagship", "17"]
+  },
+  {
+    id: "ONEP-CE4",
+    merchant: "Croma-Retail",
+    name: "OnePlus Nord CE 4 5G 256GB Celadon Marble",
+    category: "electronics",
+    price: 24999,
+    currency: "INR",
+    inStock: true,
+    description: "Snapdragon 7 Gen 3, 100W SUPERVOOC Fast Charging, 120Hz Fluid AMOLED display, 50MP Sony LYT-600 OIS camera.",
+    tags: ["phone", "smartphone", "oneplus", "nord", "mobile", "android", "5g"]
+  },
+  {
+    id: "SAMS-M55",
+    merchant: "Shopify-India",
+    name: "Samsung Galaxy M55 5G 128GB Denim Black",
+    category: "electronics",
+    price: 26999,
+    currency: "INR",
+    inStock: true,
+    description: "Snapdragon 7 Gen 1, Super AMOLED+ 120Hz display, 50MP OIS No Shake Camera, 45W fast charging.",
+    tags: ["phone", "smartphone", "samsung", "galaxy", "mobile", "android", "5g"]
   },
   {
     id: "SONY-55",
