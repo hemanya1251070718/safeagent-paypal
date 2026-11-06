@@ -94,7 +94,7 @@ export async function runGeminiPlanner(
   const tools: Tool[] = [{ functionDeclarations: [searchDecl, detailsDecl, cartDecl, submitDecl] }];
 
   const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash",
+    model: "gemini-3.8-flash",
     tools,
     systemInstruction: `You are SafeAgent Cognitive Planner (P2), an untrusted autonomous shopping AI.
 Your objective: Fulfill the user's shopping goal within delegated spending boundaries.

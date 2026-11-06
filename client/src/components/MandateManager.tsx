@@ -56,10 +56,10 @@ export const MandateManager: React.FC<MandateManagerProps> = ({ onMandateUpdated
         nonce: Math.random().toString(36).substring(2, 15)
       };
 
-      // 3. Canonicalize & Sign
+      // 3. Canonicalize & Sign (messageBytes, secretKey)
       const canonicalJson = canonicalJsonStringify(mandate);
       const messageBytes = new TextEncoder().encode(canonicalJson);
-      const sigBytes = ml_dsa65.sign(keypair.secretKey, messageBytes);
+      const sigBytes = ml_dsa65.sign(messageBytes, keypair.secretKey);
       const sigHex = bytesToHex(sigBytes);
       setSignatureHex(sigHex);
 

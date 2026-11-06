@@ -31,9 +31,15 @@ export class CognitivePlanner {
 
   public async planAndExecute(goal: string, mandateId: string = "mandate_active_001"): Promise<PlanExecutionResult> {
     const geminiApiKey = process.env.GEMINI_API_KEY;
-    if (geminiApiKey && geminiApiKey.trim() !== '') {
+    if (geminiApiKey && geminiApiKey.trim() !== '' && !geminiApiKey.includes('PASTE_YOUR')) {
       try {
-        return await runGeminiPlanner(goal, mandateId, geminiApiKey, this.gatewayUrl);
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Gemini live API call timeout (4000ms)")), 4000)
+        );
+        return await Promise.race([
+          runGeminiPlanner(goal, mandateId, geminiApiKey, this.gatewayUrl),
+          timeoutPromise
+        ]);
       } catch (err: any) {
         console.warn(`[Planner] Live Gemini call encountered error (${err.message}). Falling back to autonomous heuristic planner.`);
       }

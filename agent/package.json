@@ -6,6 +6,8 @@
     "build": "tsc",
     "dev": "tsx src/service.ts",
     "cli": "tsx src/cli.ts",
+    "mcp": "tsx src/core/mcpServer.ts",
+    "test": "tsx test/agent.test.ts",
     "scenario:tier1": "tsx src/scenarios/runTier1.ts",
     "scenario:tier2": "tsx src/scenarios/runTier2.ts",
     "scenario:injection": "tsx src/scenarios/runInjectionAttack.ts",

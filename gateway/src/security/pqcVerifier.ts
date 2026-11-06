@@ -18,8 +18,8 @@ export function verifyMandateSignature(
     const publicKeyBytes = hexToBytes(publicKeyHex);
     const signatureBytes = hexToBytes(signatureHex);
 
-    // NIST FIPS 204 ML-DSA verification
-    const isValid = ml_dsa65.verify(publicKeyBytes, messageBytes, signatureBytes);
+    // NIST FIPS 204 ML-DSA verification: ml_dsa65.verify(sig, msg, publicKey)
+    const isValid = ml_dsa65.verify(signatureBytes, messageBytes, publicKeyBytes);
 
     return {
       valid: isValid,

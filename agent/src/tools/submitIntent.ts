@@ -46,15 +46,23 @@ export async function executeSubmitIntent(input: SubmitIntentInput, gatewayUrl: 
   };
 
   try {
-    // Attempt real HTTP POST to Gateway
+    // Attempt real HTTP POST to Gateway (allow 200, 202, 422 policy responses)
     const response = await axios.post(`${gatewayUrl}/intents`, intentPayload, {
       timeout: 3000,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
+      validateStatus: (status) => status < 500
     });
 
+    const data = response.data;
     return {
-      status: "SUBMITTED_TO_GATEWAY",
-      gatewayResponse: response.data
+      status: data.status || "SUBMITTED_TO_GATEWAY",
+      policyDecision: data.policyDecision,
+      tier: data.tier,
+      reason: data.reasons?.join("; ") || data.error,
+      orderId: data.orderId,
+      captureId: data.captureId,
+      gatewayResponse: data,
+      intent: intentPayload
     };
   } catch (err: any) {
     // If Gateway is offline during independent P2 development, provide high-fidelity deterministic simulation
