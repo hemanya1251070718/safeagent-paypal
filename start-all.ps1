@@ -1,6 +1,6 @@
 # SafeAgent Unified Multi-Service Launch Script
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "  🚀 Launching SafeAgent Full Stack Console (4 Services)  " -ForegroundColor Cyan
+Write-Host "  [*] Launching SafeAgent Full Stack Console (4 Services)  " -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
 $baseDir = $PSScriptRoot
@@ -23,7 +23,7 @@ Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$baseDir\clie
 
 Start-Sleep -Seconds 3
 
-Write-Host "`n✔ All 4 services launched in separate windows!" -ForegroundColor Green
+Write-Host ""
+Write-Host "[SUCCESS] All 4 services launched in separate windows!" -ForegroundColor Green
 Write-Host "Opening SafeAgent Operating Console at: http://localhost:5173" -ForegroundColor Cyan
 Start-Process "http://localhost:5173"
-
