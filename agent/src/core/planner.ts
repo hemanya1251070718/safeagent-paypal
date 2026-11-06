@@ -2,6 +2,7 @@ import { executeSearchProducts } from '../tools/searchProducts.js';
 import { executeGetProductDetails } from '../tools/getProductDetails.js';
 import { executeBuildCart } from '../tools/buildCart.js';
 import { executeSubmitIntent } from '../tools/submitIntent.js';
+import { runGeminiPlanner } from './geminiPlanner.js';
 
 export interface ReasoningStep {
   step: number;
@@ -29,6 +30,15 @@ export class CognitivePlanner {
   }
 
   public async planAndExecute(goal: string, mandateId: string = "mandate_active_001"): Promise<PlanExecutionResult> {
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    if (geminiApiKey && geminiApiKey.trim() !== '') {
+      try {
+        return await runGeminiPlanner(goal, mandateId, geminiApiKey, this.gatewayUrl);
+      } catch (err: any) {
+        console.warn(`[Planner] Live Gemini call encountered error (${err.message}). Falling back to autonomous heuristic planner.`);
+      }
+    }
+
     const trace: ReasoningStep[] = [];
     let stepCount = 1;
 

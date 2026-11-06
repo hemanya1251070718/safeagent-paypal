@@ -1,9 +1,9 @@
+@import 'ag-grid-community/styles/ag-grid.css';
+@import 'ag-grid-community/styles/ag-theme-alpine.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import 'ag-grid-community/styles/ag-grid.css';
-@import 'ag-grid-community/styles/ag-theme-alpine.css';
 
 body {
   margin: 0;
@@ -19,4 +19,3 @@ body {
   --ag-border-color: #334155;
   --ag-foreground-color: #f8fafc;
 }
-

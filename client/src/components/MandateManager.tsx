@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { KeyRound, Shield, CheckCircle2, Lock } from 'lucide-react';
-import { ml_dsa65 } from '@noble/post-quantum/ml-dsa';
+import { ml_dsa65 } from '@noble/post-quantum/ml-dsa.js';
 import { bytesToHex, canonicalJsonStringify } from '../../../shared/dist/index.js';
 import axios from 'axios';
 

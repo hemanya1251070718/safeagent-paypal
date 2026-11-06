@@ -1,4 +1,4 @@
-import { ml_dsa65 } from '@noble/post-quantum/ml-dsa';
+import { ml_dsa65 } from '@noble/post-quantum/ml-dsa.js';
 import { canonicalJsonStringify, hexToBytes } from '../../../shared/dist/index.js';
 
 export interface PqcVerificationResult {
