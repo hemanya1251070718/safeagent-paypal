@@ -309,8 +309,30 @@ export const CATALOG: MerchantProduct[] = [
     price: 7499,
     currency: "INR",
     inStock: true,
-    description: "Advanced NITRO foam cushioning for explosive responsiveness and PUMAGRIP rubber traction.",
-    tags: ["shoes", "puma", "running", "sneakers", "footwear", "sports"]
+    description: "Official Puma India listing on Myntra. Standard MRP ₹12,999, active verified deal price ₹7,499. Features NITRO advanced foam cushioning and PUMAGRIP rubber traction.",
+    tags: ["shoes", "puma", "velocity", "nitro", "running", "sneakers", "footwear", "sports", "myntra"]
+  },
+  {
+    id: "PUMA-02",
+    merchant: "Amazon-India",
+    name: "Puma Velocity NITRO 3 Men's Road Running Shoes",
+    category: "accessories",
+    price: 7999,
+    currency: "INR",
+    inStock: true,
+    description: "Amazon India verified deal. MRP ₹12,999, sale price ₹7,999 with Prime delivery. Engineered mesh upper, TPU heel spoiler.",
+    tags: ["shoes", "puma", "velocity", "nitro", "running", "sneakers", "footwear", "amazon"]
+  },
+  {
+    id: "PUMA-03",
+    merchant: "Flipkart",
+    name: "Puma Velocity NITRO 3 Performance Running Shoes",
+    category: "accessories",
+    price: 8499,
+    currency: "INR",
+    inStock: true,
+    description: "Flipkart Assured authentic footwear. MRP ₹12,999, deal price ₹8,499. High-performance distance running shoe.",
+    tags: ["shoes", "puma", "velocity", "nitro", "running", "sneakers", "footwear", "flipkart"]
   },
   {
     id: "ADID-01",

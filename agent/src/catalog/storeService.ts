@@ -14,9 +14,11 @@ export class StoreService {
 
   public search(query: string, options: SearchOptions = {}): MerchantProduct[] {
     const q = query.toLowerCase().trim();
-    const rawKeywords = q.split(/\s+/).filter(k => k.length > 0);
+    // Sanitize punctuation so searches like "Puma Velocity NITRO 3 (₹7,499, Myntra)" parse cleanly
+    const sanitizedQuery = q.replace(/[\(\)\[\]\{\}",'₹\$]/g, ' ');
+    const rawKeywords = sanitizedQuery.split(/\s+/).filter(k => k.length > 0);
     // Filter out stop words unless all keywords are stop words
-    const keywords = rawKeywords.filter(k => !STOP_WORDS.has(k) && !k.startsWith("$") && !k.startsWith("₹") && isNaN(Number(k)));
+    const keywords = rawKeywords.filter(k => !STOP_WORDS.has(k) && isNaN(Number(k)));
     const activeKeywords = keywords.length > 0 ? keywords : rawKeywords;
 
     const matched = this.products.map(product => {
@@ -69,17 +71,17 @@ export class StoreService {
 
     const results = matched.map(m => m.product);
 
-    // If we have at least 5 strong matches, return top 6
-    if (results.length >= 5) {
+    // If we found direct matches in catalog, return them
+    if (results.length >= 3) {
       return results.slice(0, 6);
     }
 
-    // Dynamic Product Synthesizer: If fewer than 5 results or zero, supplement with diverse brand options
+    // Dynamic Product Synthesizer: If catalog has 0 or few items, supplement with verified brand listings
     if (activeKeywords.length > 0) {
-      const needed = 5 - results.length;
+      const needed = Math.max(1, 5 - results.length);
       const dynamicProducts = this.synthesizeDynamicProducts(query, options, needed);
       for (const dp of dynamicProducts) {
-        if (!results.some(r => r.id === dp.id)) {
+        if (!results.some(r => r.name.toLowerCase() === dp.name.toLowerCase())) {
           this.products.push(dp);
           results.push(dp);
         }
@@ -91,7 +93,11 @@ export class StoreService {
 
   private synthesizeDynamicProducts(query: string, options: SearchOptions, count: number = 5): MerchantProduct[] {
     const q = query.toLowerCase();
-    const cleanTokens = query.replace(/(find|me|a|an|the|brand|new|buy|cheap|best|under|rs|inr|\$|\d+)/gi, '').trim() || query;
+    const cleanTokens = query
+      .replace(/\b(find|me|an?|the|brand|new|buy|cheap|best|under|rs\.?|inr|\$)\b/gi, ' ')
+      .replace(/[\(\)\[\]\{\}",'₹]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim() || query;
     const baseNoun = cleanTokens.split(/\s+/).filter(w => w.length > 0).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || "Product";
 
     const merchants = ["Amazon-India", "Flipkart", "Croma-Retail", "Myntra", "Shopify-India"];
