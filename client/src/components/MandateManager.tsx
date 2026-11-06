@@ -13,9 +13,11 @@ export const MandateManager: React.FC<MandateManagerProps> = ({ onMandateUpdated
   const [tier1Limit, setTier1Limit] = useState<number>(2500.0);
   const [ttlHours, setTtlHours] = useState<number>(24);
   const [whitelistedMerchants, setWhitelistedMerchants] = useState<string[]>([
-    "Shopify-India",
+    "Amazon-India",
+    "Flipkart",
     "Croma-Retail",
-    "Reliance-Digital"
+    "Myntra",
+    "Shopify-India"
   ]);
   const [status, setStatus] = useState<string>('DEFAULT_SEED_ACTIVE');
   const [publicKeyHex, setPublicKeyHex] = useState<string>('');
@@ -137,7 +139,7 @@ export const MandateManager: React.FC<MandateManagerProps> = ({ onMandateUpdated
       <div className="mb-5">
         <label className="block text-xs font-semibold text-slate-300 mb-2">Merchant Whitelist (Allowed Stores)</label>
         <div className="flex flex-wrap gap-2">
-          {["Shopify-India", "Croma-Retail", "Reliance-Digital", "Medusa-India", "DarkMarket-Malicious"].map((merchant) => {
+          {["Amazon-India", "Flipkart", "Croma-Retail", "Myntra", "Shopify-India", "DarkMarket-Malicious"].map((merchant) => {
             const isApproved = whitelistedMerchants.includes(merchant);
             const isRogue = merchant.includes("Malicious");
             return (

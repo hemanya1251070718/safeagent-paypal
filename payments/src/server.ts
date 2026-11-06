@@ -27,7 +27,7 @@ ledger.append('MANDATE_CREATED', {
   maxSpend: 15000.0,
   tier1Limit: 2500.0,
   currency: 'INR',
-  whitelist: ['Shopify-India', 'Croma-Retail', 'Reliance-Digital', 'Shopify-TechStore', 'Medusa-OfficePro']
+  whitelist: ['Amazon-India', 'Flipkart', 'Croma-Retail', 'Myntra', 'Shopify-India', 'Shopify-TechStore', 'Medusa-OfficePro']
 }, 'mandate_active_001');
 
 // Health Check

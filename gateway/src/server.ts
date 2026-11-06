@@ -22,7 +22,7 @@ const defaultMandate: SpendingMandate = {
   ttlHours: 24,
   createdAt: Date.now(),
   expiresAt: Date.now() + 24 * 60 * 60 * 1000,
-  merchantWhitelist: ["Shopify-India", "Croma-Retail", "Reliance-Digital", "Shopify-TechStore", "Medusa-OfficePro"],
+  merchantWhitelist: ["Amazon-India", "Flipkart", "Croma-Retail", "Myntra", "Shopify-India", "Shopify-TechStore", "Medusa-OfficePro"],
   tier1Limit: 2500.00,
   remainingBalance: 15000.00,
   nonce: "seed_nonce_001"

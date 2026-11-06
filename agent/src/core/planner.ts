@@ -73,7 +73,12 @@ export class CognitivePlanner {
 
     log('TOOL_CALL', `Calling tool: search_products(query="${query}", maxPrice=${maxBudget ? `₹${maxBudget}` : 'None'})`);
     const searchResult = await executeSearchProducts({ query, maxPrice: maxBudget });
-    log('TOOL_RESULT', `Catalog returned ${searchResult.count} matching products.`, searchResult);
+
+    const candidateSummary = searchResult.products.slice(0, 5).map((p, idx) => 
+      `[${idx + 1}] ${p.name} (₹${p.price.toLocaleString('en-IN')}, ${p.merchant})`
+    ).join('  •  ');
+
+    log('TOOL_RESULT', `Discovered ${searchResult.count} matching options within budget:\n${candidateSummary}`, searchResult);
 
     if (searchResult.count === 0) {
       log('THOUGHT', `No products directly matched query "${query}". Broadening query to find related items.`);
@@ -95,7 +100,7 @@ export class CognitivePlanner {
     }
 
     const sym = chosenProduct.currency === 'INR' ? '₹' : '$';
-    log('THOUGHT', `Selecting best matching item: "${chosenProduct.name}" from merchant "${chosenProduct.merchant}" at ${sym}${chosenProduct.price.toLocaleString('en-IN')} ${chosenProduct.currency}.`);
+    log('THOUGHT', `Evaluated ${searchResult.count} candidate options. Selecting top-ranked candidate: "${chosenProduct.name}" from ${chosenProduct.merchant} at ${sym}${chosenProduct.price.toLocaleString('en-IN')} ${chosenProduct.currency}.`);
     log('TOOL_CALL', `Calling tool: get_product_details(productId="${chosenProduct.id}")`);
     const details = await executeGetProductDetails({ productId: chosenProduct.id });
     log('TOOL_RESULT', `Retrieved full product specifications and inventory status.`, details);

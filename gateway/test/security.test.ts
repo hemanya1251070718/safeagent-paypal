@@ -36,7 +36,7 @@ const testMandate: SpendingMandate = {
   ttlHours: 24,
   createdAt: Date.now(),
   expiresAt: Date.now() + 86400000,
-  merchantWhitelist: ["Shopify-India", "Croma-Retail", "Shopify-TechStore", "Medusa-OfficePro"],
+  merchantWhitelist: ["Amazon-India", "Flipkart", "Croma-Retail", "Myntra", "Shopify-India", "Shopify-TechStore", "Medusa-OfficePro"],
   tier1Limit: 2500.0,
   remainingBalance: 15000.0,
   nonce: "pqc_nonce_1"
