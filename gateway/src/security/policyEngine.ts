@@ -47,8 +47,9 @@ export class PolicyEngine {
     }
 
     // 5. Spend Limits
+    const sym = mandate.currency === 'INR' ? '₹' : '$';
     if (intent.total > mandate.remainingBalance) {
-      reasons.push(`Cart total ($${intent.total}) exceeds remaining mandate balance ($${mandate.remainingBalance.toFixed(2)}).`);
+      reasons.push(`Cart total (${sym}${intent.total.toFixed(2)}) exceeds remaining mandate balance (${sym}${mandate.remainingBalance.toFixed(2)} ${mandate.currency}).`);
     }
 
     // 6. Adversarial Prompt Injection Sanitization Firewall
@@ -84,7 +85,7 @@ export class PolicyEngine {
       return {
         valid: true,
         tier: 1,
-        reasons: [`Total $${intent.total} <= Tier 1 threshold ($${mandate.tier1Limit}). Auto-approved.`],
+        reasons: [`Total ${sym}${intent.total.toFixed(2)} <= Tier 1 threshold (${sym}${mandate.tier1Limit.toFixed(2)} ${mandate.currency}). Auto-approved.`],
         sanitizationAlerts
       };
     } else {
@@ -92,7 +93,7 @@ export class PolicyEngine {
       return {
         valid: true,
         tier: 2,
-        reasons: [`Total $${intent.total} exceeds Tier 1 limit ($${mandate.tier1Limit}). Paused for user biometric confirmation.`],
+        reasons: [`Total ${sym}${intent.total.toFixed(2)} exceeds Tier 1 limit (${sym}${mandate.tier1Limit.toFixed(2)} ${mandate.currency}). Paused for user biometric confirmation.`],
         sanitizationAlerts
       };
     }

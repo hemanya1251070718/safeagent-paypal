@@ -39,10 +39,11 @@ export async function executeBuildCart(input: BuildCartInput) {
     return { error: "Cart cannot be empty." };
   }
 
-  const taxRate = (input.taxRatePercent ?? 8.0) / 100;
+  const taxRate = (input.taxRatePercent ?? 18.0) / 100; // 18% GST (Goods and Services Tax)
   const cartItems: CartItem[] = [];
   let subtotal = 0;
   let primaryMerchant: string | null = null;
+  let orderCurrency = "INR";
 
   for (const item of input.items) {
     const product = storeService.getById(item.productId);
@@ -52,6 +53,8 @@ export async function executeBuildCart(input: BuildCartInput) {
     if (!product.inStock) {
       return { error: `Product '${product.name}' is out of stock.` };
     }
+
+    orderCurrency = product.currency || "INR";
 
     if (!primaryMerchant) {
       primaryMerchant = product.merchant;
@@ -85,7 +88,7 @@ export async function executeBuildCart(input: BuildCartInput) {
       subtotal,
       tax,
       total,
-      currency: "USD"
+      currency: orderCurrency
     }
   };
 }

@@ -9,12 +9,13 @@ interface MandateManagerProps {
 }
 
 export const MandateManager: React.FC<MandateManagerProps> = ({ onMandateUpdated }) => {
-  const [maxSpend, setMaxSpend] = useState<number>(100.0);
-  const [tier1Limit, setTier1Limit] = useState<number>(30.0);
+  const [maxSpend, setMaxSpend] = useState<number>(15000.0);
+  const [tier1Limit, setTier1Limit] = useState<number>(2500.0);
   const [ttlHours, setTtlHours] = useState<number>(24);
   const [whitelistedMerchants, setWhitelistedMerchants] = useState<string[]>([
-    "Shopify-TechStore",
-    "Medusa-OfficePro"
+    "Shopify-India",
+    "Croma-Retail",
+    "Reliance-Digital"
   ]);
   const [status, setStatus] = useState<string>('DEFAULT_SEED_ACTIVE');
   const [publicKeyHex, setPublicKeyHex] = useState<string>('');
@@ -46,7 +47,7 @@ export const MandateManager: React.FC<MandateManagerProps> = ({ onMandateUpdated
         mandateId: `mandate_${Date.now()}`,
         userId: "user_web_client",
         maxSpend,
-        currency: "USD",
+        currency: "INR",
         ttlHours,
         createdAt: Date.now(),
         expiresAt: Date.now() + ttlHours * 3600 * 1000,
@@ -102,13 +103,13 @@ export const MandateManager: React.FC<MandateManagerProps> = ({ onMandateUpdated
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
         <div>
           <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-            Max Spend Cap: <span className="text-blue-400 font-mono text-sm">${maxSpend.toFixed(2)} USD</span>
+            Max Spend Cap: <span className="text-blue-400 font-mono text-sm">₹{maxSpend.toLocaleString('en-IN')} INR</span>
           </label>
           <input
             type="range"
-            min="20"
-            max="300"
-            step="5"
+            min="1000"
+            max="50000"
+            step="500"
             value={maxSpend}
             onChange={(e) => setMaxSpend(parseFloat(e.target.value))}
             className="w-full accent-blue-500 cursor-pointer"
@@ -118,13 +119,13 @@ export const MandateManager: React.FC<MandateManagerProps> = ({ onMandateUpdated
 
         <div>
           <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-            Tier 1 Auto-Approve Limit: <span className="text-emerald-400 font-mono text-sm">${tier1Limit.toFixed(2)} USD</span>
+            Tier 1 Auto-Approve Limit: <span className="text-emerald-400 font-mono text-sm">₹{tier1Limit.toLocaleString('en-IN')} INR</span>
           </label>
           <input
             type="range"
-            min="10"
-            max="100"
-            step="5"
+            min="500"
+            max="10000"
+            step="250"
             value={tier1Limit}
             onChange={(e) => setTier1Limit(parseFloat(e.target.value))}
             className="w-full accent-emerald-500 cursor-pointer"
@@ -136,7 +137,7 @@ export const MandateManager: React.FC<MandateManagerProps> = ({ onMandateUpdated
       <div className="mb-5">
         <label className="block text-xs font-semibold text-slate-300 mb-2">Merchant Whitelist (Allowed Stores)</label>
         <div className="flex flex-wrap gap-2">
-          {["Shopify-TechStore", "Medusa-OfficePro", "DarkMarket-Malicious"].map((merchant) => {
+          {["Shopify-India", "Croma-Retail", "Reliance-Digital", "Medusa-India", "DarkMarket-Malicious"].map((merchant) => {
             const isApproved = whitelistedMerchants.includes(merchant);
             const isRogue = merchant.includes("Malicious");
             return (

@@ -5,10 +5,10 @@ async function run() {
   console.log(chalk.bold.cyan("\n================================================================="));
   console.log(chalk.bold.cyan("  SCENARIO 1: TIER 1 MICRO-TRANSACTION (ZERO-TOUCH EXECUTION)"));
   console.log(chalk.bold.cyan("================================================================="));
-  console.log(chalk.gray("Target Goal: 'Find me an ergonomic wireless mouse under $30'"));
-  console.log(chalk.gray("Expected Policy: Cart total <= $30.00 Tier 1 threshold -> Instant server capture via PayPal Vault\n"));
+  console.log(chalk.gray("Target Goal: 'Find me an ergonomic wireless mouse under ₹2,000'"));
+  console.log(chalk.gray("Expected Policy: Cart total <= ₹2,500 Tier 1 threshold -> Instant server capture via PayPal Vault\n"));
 
-  const result = await cognitivePlanner.planAndExecute("Find me an ergonomic wireless mouse under $30");
+  const result = await cognitivePlanner.planAndExecute("Find me an ergonomic wireless mouse under ₹2,000");
 
   for (const step of result.trace) {
     if (step.type === 'THOUGHT') {

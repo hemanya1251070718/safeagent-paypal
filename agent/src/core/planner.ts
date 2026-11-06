@@ -65,11 +65,9 @@ export class CognitivePlanner {
     let maxBudget: number | undefined;
 
     const lowerGoal = goal.toLowerCase();
-    if (lowerGoal.includes("under $") || lowerGoal.includes("under ")) {
-      const match = lowerGoal.match(/under\s*\$?(\d+(\.\d+)?)/);
-      if (match && match[1]) {
-        maxBudget = parseFloat(match[1]);
-      }
+    const budgetMatch = lowerGoal.match(/(?:under|below|less than|within)\s*(?:₹|rs\.?|inr|\$)?\s*(\d+(?:,\d+)*(?:\.\d+)?)/);
+    if (budgetMatch && budgetMatch[1]) {
+      maxBudget = parseFloat(budgetMatch[1].replace(/,/g, ''));
     }
 
     log('TOOL_CALL', `Calling tool: search_products(query="${query}", maxPrice=${maxBudget ?? 'None'})`);
@@ -139,20 +137,21 @@ export class CognitivePlanner {
     if (submission.policyDecision === 'REJECTED' && submission.reason?.includes('BUDGET_EXCEEDED')) {
       log('RECOVERY', `Gateway blocked intent due to budget cap. Initiating autonomous fallback discovery for lower-cost alternatives.`);
       
-      const budgetSearch = await executeSearchProducts({ query: "monitor", maxPrice: 95.0 });
-      log('TOOL_RESULT', `Budget recovery search returned ${budgetSearch.count} options under $95.`, budgetSearch);
+      const budgetCategory = lowerGoal.includes("monitor") || lowerGoal.includes("screen") ? "monitor" : (lowerGoal.includes("phone") || lowerGoal.includes("iphone")) ? "accessories" : "accessories";
+      const budgetSearch = await executeSearchProducts({ query: budgetCategory, maxPrice: 8500 });
+      log('TOOL_RESULT', `Budget recovery search returned ${budgetSearch.count} options under budget.`, budgetSearch);
 
       if (budgetSearch.count > 0) {
         const altProduct = budgetSearch.products[0];
-        log('THOUGHT', `Autonomous recovery: Found alternative "${altProduct.name}" for $${altProduct.price}. Composing replacement cart.`);
+        log('THOUGHT', `Autonomous recovery: Found alternative "${altProduct.name}" for ₹${altProduct.price} ${altProduct.currency}. Composing replacement cart.`);
 
         const altCart = await executeBuildCart({
           items: [{ productId: altProduct.id, quantity: 1 }],
-          taxRatePercent: 8.0
+          taxRatePercent: 18.0
         });
 
         if (altCart.cart) {
-          log('TOOL_CALL', `Resubmitting revised intent with budget alternative: Total=$${altCart.cart.total}`);
+          log('TOOL_CALL', `Resubmitting revised intent with budget alternative: Total=₹${altCart.cart.total}`);
           submission = await executeSubmitIntent({
             mandateId,
             merchant: altCart.cart.merchant,
@@ -161,7 +160,7 @@ export class CognitivePlanner {
             tax: altCart.cart.tax,
             total: altCart.cart.total,
             currency: altCart.cart.currency,
-            agentReasoning: `Autonomous recovery: Replaced over-budget monitor with compliant alternative '${altProduct.name}' ($${altProduct.price}).`
+            agentReasoning: `Autonomous recovery: Replaced over-budget item with compliant alternative '${altProduct.name}' (₹${altProduct.price}).`
           }, this.gatewayUrl);
 
           log('GATEWAY_RESPONSE', `Revised intent evaluation: ${submission.status}`, submission);

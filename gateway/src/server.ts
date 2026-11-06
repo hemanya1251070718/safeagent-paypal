@@ -17,14 +17,14 @@ app.use(express.json());
 const defaultMandate: SpendingMandate = {
   mandateId: "mandate_active_001",
   userId: "user_demo_789",
-  maxSpend: 100.00,
-  currency: "USD",
+  maxSpend: 15000.00,
+  currency: "INR",
   ttlHours: 24,
   createdAt: Date.now(),
   expiresAt: Date.now() + 24 * 60 * 60 * 1000,
-  merchantWhitelist: ["Shopify-TechStore", "Medusa-OfficePro"],
-  tier1Limit: 30.00,
-  remainingBalance: 100.00,
+  merchantWhitelist: ["Shopify-India", "Croma-Retail", "Reliance-Digital", "Shopify-TechStore", "Medusa-OfficePro"],
+  tier1Limit: 2500.00,
+  remainingBalance: 15000.00,
   nonce: "seed_nonce_001"
 };
 policyEngine.registerMandate(defaultMandate);

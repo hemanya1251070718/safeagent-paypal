@@ -25,10 +25,10 @@ async function runTests() {
 
   // [Group 1] Catalog & Relevance Ranking
   console.log("[Group 1] Catalog & Relevance Search");
-  const mouseResults = storeService.search("find me an ergonomic mouse under 30 dollars", { maxPrice: 30 });
-  assert(mouseResults.length > 0, "Keyword search returns items under $30");
+  const mouseResults = storeService.search("find me an ergonomic mouse under 2000 rupees", { maxPrice: 2000 });
+  assert(mouseResults.length > 0, "Keyword search returns items under ₹2,000");
   assert(mouseResults[0].id === "TECH-101", "Top match for ergonomic mouse is Anker Ergonomic Mouse (TECH-101)");
-  assert(mouseResults[0].merchant === "Shopify-TechStore", "Merchant origin matches whitelisted store");
+  assert(mouseResults[0].merchant === "Shopify-India", "Merchant origin matches whitelisted store");
 
   // Out of stock filter
   const allDark = storeService.search("flash drive", { merchant: "DarkMarket-Malicious" });
@@ -36,11 +36,11 @@ async function runTests() {
 
   // [Group 2] Semantic Vector Embeddings
   console.log("\n[Group 2] Semantic Vector Embeddings");
-  // Query with no overlapping keywords: "cordless screen pointer" -> should match Anker Mouse or MX Master
+  // Query with no overlapping keywords: "cordless screen pointer" -> should match Anker Mouse
   const semanticRes = await semanticSearchService.search("cordless screen pointer");
   assert(semanticRes.length > 0, "Semantic search returns candidates for 'cordless screen pointer'");
-  const topSemanticId = semanticRes[0].product.id;
-  assert(topSemanticId === "TECH-101" || topSemanticId === "MED-201", "Top semantic match is a mouse SKU (TECH-101 or MED-201)");
+  const topSemantic = semanticRes[0].product;
+  assert(topSemantic.tags.includes("mouse") || topSemantic.id === "TECH-101", "Top semantic match is a mouse product");
   console.log(`     (Matched: ${semanticRes[0].product.name} | Engine: ${semanticRes[0].engine} | Score: ${semanticRes[0].score.toFixed(3)})`);
 
   // Hybrid tool search
@@ -50,14 +50,14 @@ async function runTests() {
 
   // [Group 3] Cart Engine & Financial Math
   console.log("\n[Group 3] Cart Engine & Financial Math");
-  // TECH-101 is $24.99. 8% tax = $2.00. Total = $26.99
+  // TECH-101 is ₹1,899. 18% GST = ₹341.82. Total = ₹2,240.82
   const cartRes = await executeBuildCart({
     items: [{ productId: "TECH-101", quantity: 1 }]
   });
   assert(cartRes.cart !== undefined, "Cart built successfully");
-  assert(cartRes.cart?.subtotal === 24.99, "Cart subtotal matches item price ($24.99)");
-  assert(cartRes.cart?.tax === 2.0, "Sales tax calculated at 8% rounded to 2 decimals ($2.00)");
-  assert(cartRes.cart?.total === 26.99, "Total equals subtotal + tax ($26.99)");
+  assert(cartRes.cart?.subtotal === 1899, "Cart subtotal matches item price (₹1,899)");
+  assert(cartRes.cart?.tax === 341.82, "GST calculated at 18% rounded to 2 decimals (₹341.82)");
+  assert(cartRes.cart?.total === 2240.82, "Total equals subtotal + GST (₹2,240.82)");
 
   // Reject out of stock / invalid
   const invalidCart = await executeBuildCart({
@@ -69,13 +69,13 @@ async function runTests() {
   console.log("\n[Group 4] Autonomous Planner Execution");
   const planner = new CognitivePlanner("http://localhost:3000");
   const planTier1 = await planner.planAndExecute(
-    "Buy me an ergonomic wireless mouse under $30",
+    "Buy me an ergonomic wireless mouse under ₹2500",
     "mandate_test_p2"
   );
   assert(planTier1.trace.length > 0, "Planner generates cognitive reasoning trace");
   assert(planTier1.intent !== undefined, "Planner successfully generated checkout intent");
   const planTotal = planTier1.intent ? (planTier1.intent.total ?? planTier1.intent.totalAmount) : 0;
-  assert(planTotal <= 30.0, `Cart total ($${planTotal}) strictly stays under $30 user constraint`);
+  assert(planTotal <= 2500.0, `Cart total (₹${planTotal}) strictly stays under ₹2,500 user constraint`);
 
   // [Group 5] Standard MCP Server Registration
   console.log("\n[Group 5] Model Context Protocol (MCP) Server");

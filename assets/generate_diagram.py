@@ -310,3 +310,4 @@ if __name__ == "__main__":
     with open(out_svg, "w", encoding="utf-8") as f:
         f.write(content)
     print("Generated SVG at:", out_svg)
+

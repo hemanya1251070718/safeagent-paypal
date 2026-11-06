@@ -6,7 +6,7 @@ async function run() {
   console.log(chalk.bold.yellow("  SCENARIO 2: TIER 2 DISCRETIONARY (BIOMETRIC CONFIRMATION)"));
   console.log(chalk.bold.yellow("================================================================="));
   console.log(chalk.gray("Target Goal: 'Buy me a Keychron mechanical keyboard for coding'"));
-  console.log(chalk.gray("Expected Policy: Cart total > $30 Tier 1 threshold -> Two-phase commit paused for 1-tap user biometric approval\n"));
+  console.log(chalk.gray("Expected Policy: Cart total > ₹2,500 Tier 1 threshold -> Two-phase commit paused for 1-tap user biometric approval\n"));
 
   const result = await cognitivePlanner.planAndExecute("Buy me a Keychron mechanical keyboard");
 

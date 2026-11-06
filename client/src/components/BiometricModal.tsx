@@ -73,7 +73,7 @@ export const BiometricModal: React.FC<BiometricModalProps> = ({ intent, onClose,
         <div className="bg-slate-950 rounded-xl p-4 border border-slate-800 mb-4 space-y-2 text-xs">
           <div className="flex justify-between text-slate-400">
             <span>Merchant:</span>
-            <span className="text-white font-medium">{intent?.merchant || 'Shopify-TechStore'}</span>
+            <span className="text-white font-medium">{intent?.merchant || 'Shopify-India'}</span>
           </div>
           <div className="flex justify-between text-slate-400">
             <span>Items:</span>
@@ -83,12 +83,12 @@ export const BiometricModal: React.FC<BiometricModalProps> = ({ intent, onClose,
           </div>
           <div className="flex justify-between text-slate-400 border-t border-slate-800/80 pt-2 font-semibold">
             <span className="text-slate-300">Total Authorized Amount:</span>
-            <span className="text-blue-400 font-mono text-sm">${intent?.total?.toFixed(2) || '0.00'} USD</span>
+            <span className="text-blue-400 font-mono text-sm">₹{intent?.total ? Number(intent.total).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'} INR</span>
           </div>
         </div>
 
         <div className="text-xs text-slate-400 mb-6 bg-slate-800/40 p-3 rounded-lg border border-slate-700/40">
-          This cart total exceeds your <strong>$30.00 Tier 1 zero-touch limit</strong>. The Policy Gateway has paused execution and requires your cryptographic passkey/biometric consent.
+          This cart total exceeds your <strong>₹2,500 Tier 1 zero-touch limit</strong>. The SafeAgent Policy Gateway has safely paused execution and requires your cryptographic passkey/biometric consent.
         </div>
 
         <div className="flex space-x-3">

@@ -31,14 +31,14 @@ const pubHex = bytesToHex(keypair.publicKey);
 const testMandate: SpendingMandate = {
   mandateId: "mandate_sec_test_001",
   userId: "user_sec_audit",
-  maxSpend: 100.0,
-  currency: "USD",
+  maxSpend: 15000.0,
+  currency: "INR",
   ttlHours: 24,
   createdAt: Date.now(),
   expiresAt: Date.now() + 86400000,
-  merchantWhitelist: ["Shopify-TechStore", "Medusa-OfficePro"],
-  tier1Limit: 30.0,
-  remainingBalance: 100.0,
+  merchantWhitelist: ["Shopify-India", "Croma-Retail", "Shopify-TechStore", "Medusa-OfficePro"],
+  tier1Limit: 2500.0,
+  remainingBalance: 15000.0,
   nonce: "pqc_nonce_1"
 };
 
@@ -51,9 +51,9 @@ const validRes = verifyMandateSignature(testMandate, pubHex, sigHex);
 assert(validRes.valid === true, "Valid ML-DSA-65 signature must verify successfully");
 
 // --- TEST 2: Tampered Mandate Detection ---
-const tamperedMandate = { ...testMandate, maxSpend: 1000.0 };
+const tamperedMandate = { ...testMandate, maxSpend: 50000.0 };
 const tamperedRes = verifyMandateSignature(tamperedMandate, pubHex, sigHex);
-assert(tamperedRes.valid === false, "Tampered mandate ($100 -> $1000) must fail ML-DSA verification");
+assert(tamperedRes.valid === false, "Tampered mandate (₹15,000 -> ₹50,000) must fail ML-DSA verification");
 
 // Register valid mandate in policy engine
 policyEngine.registerMandate(testMandate);
@@ -63,50 +63,50 @@ console.log("\n[Group 2] Deterministic Tier Routing & Thresholds");
 const tier1Intent: CheckoutIntent = {
   intentId: "intent_t1_test",
   mandateId: testMandate.mandateId,
-  merchant: "Shopify-TechStore",
-  items: [{ id: "TECH-101", name: "Anker Mouse", price: 24.99, quantity: 1 }],
-  subtotal: 24.99,
-  tax: 2.00,
-  total: 26.99,
-  currency: "USD",
+  merchant: "Shopify-India",
+  items: [{ id: "TECH-101", name: "Anker Mouse", price: 1899.0, quantity: 1 }],
+  subtotal: 1899.0,
+  tax: 341.82,
+  total: 2240.82,
+  currency: "INR",
   nonce: "nonce_t1_unique",
   status: "PROPOSED"
 };
 const resT1 = policyEngine.validateIntent(tier1Intent);
-assert(resT1.valid === true && resT1.tier === 1, "Intent total ($26.99 <= $30) routes to Tier 1 auto-execute");
+assert(resT1.valid === true && resT1.tier === 1, "Intent total (₹2,240.82 <= ₹2,500) routes to Tier 1 auto-execute");
 
 // --- TEST 4: Tier 2 Discretionary Intercept ---
 const tier2Intent: CheckoutIntent = {
   intentId: "intent_t2_test",
   mandateId: testMandate.mandateId,
-  merchant: "Shopify-TechStore",
-  items: [{ id: "TECH-102", name: "Keychron Keyboard", price: 79.99, quantity: 1 }],
-  subtotal: 79.99,
-  tax: 6.40,
-  total: 86.39,
-  currency: "USD",
+  merchant: "Shopify-India",
+  items: [{ id: "TECH-102", name: "Keychron Keyboard", price: 6499.0, quantity: 1 }],
+  subtotal: 6499.0,
+  tax: 1169.82,
+  total: 7668.82,
+  currency: "INR",
   nonce: "nonce_t2_unique",
   status: "PROPOSED"
 };
 const resT2 = policyEngine.validateIntent(tier2Intent);
-assert(resT2.valid === true && resT2.tier === 2, "Intent total ($86.39 > $30) routes to Tier 2 confirmation required");
+assert(resT2.valid === true && resT2.tier === 2, "Intent total (₹7,668.82 > ₹2,500) routes to Tier 2 confirmation required");
 
 // --- TEST 5: Hard Budget Stop ---
 console.log("\n[Group 3] Adversarial Vectors & Boundary Violations");
 const overBudgetIntent: CheckoutIntent = {
   intentId: "intent_ob_test",
   mandateId: testMandate.mandateId,
-  merchant: "Shopify-TechStore",
-  items: [{ id: "TECH-105", name: "4K Monitor", price: 349.99, quantity: 1 }],
-  subtotal: 349.99,
-  tax: 28.00,
-  total: 377.99,
-  currency: "USD",
+  merchant: "Shopify-India",
+  items: [{ id: "TECH-105", name: "LG 4K Monitor", price: 29999.0, quantity: 1 }],
+  subtotal: 29999.0,
+  tax: 5399.82,
+  total: 35398.82,
+  currency: "INR",
   nonce: "nonce_ob_unique",
   status: "PROPOSED"
 };
 const resOB = policyEngine.validateIntent(overBudgetIntent);
-assert(resOB.valid === false && resOB.tier === 3, "Intent exceeding $100 cap ($377.99) is strictly rejected");
+assert(resOB.valid === false && resOB.tier === 3, "Intent exceeding ₹15,000 cap (₹35,398.82) is strictly rejected");
 
 // --- TEST 6: Unapproved Merchant Whitelist Defense ---
 const rogueMerchantIntent: CheckoutIntent = {

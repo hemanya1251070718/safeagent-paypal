@@ -6,7 +6,7 @@ async function run() {
   console.log(chalk.bold.magenta("  SCENARIO 4: BUDGET VIOLATION & AUTONOMOUS ADAPTATION"));
   console.log(chalk.bold.magenta("================================================================="));
   console.log(chalk.gray("Target Goal: 'I want to buy an LG 4K monitor'"));
-  console.log(chalk.gray("Expected Policy: Initial cart ($377.99) exceeds $100 cap -> Gateway REJECTS -> Agent autonomously recovers by finding compliant alternative ($89.00)\n"));
+  console.log(chalk.gray("Expected Policy: Initial cart (₹35,398.82) exceeds ₹15,000 cap -> Gateway REJECTS -> Agent autonomously recovers by finding compliant alternative (Dell Monitor ₹8,848.82)\n"));
 
   const result = await cognitivePlanner.planAndExecute("I want to buy an LG 4K monitor");
 

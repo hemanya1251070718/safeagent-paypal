@@ -34,7 +34,7 @@ app.get('/agent/mcp', (req, res) => {
     tools: [
       { name: "search_products", description: "Search merchant catalogs using keyword relevance and Gemini semantic embeddings" },
       { name: "get_product_details", description: "Retrieve complete specifications and inventory status" },
-      { name: "build_cart", description: "Calculate subtotal, 8% tax, and build verified cart" },
+      { name: "build_cart", description: "Calculate subtotal, 18% GST, and build verified cart" },
       { name: "submit_intent", description: "Submit mandate-bound checkout intent to SafeAgent deterministic gateway" }
     ],
     resources: ["safeagent://catalog/products"],
@@ -71,9 +71,9 @@ app.post('/agent/scenario/:scenarioId', async (req, res) => {
   const { scenarioId } = req.params;
   const { mandateId } = req.body;
 
-  let goal = "Find me an ergonomic wireless mouse under $30";
+  let goal = "Find me an ergonomic wireless mouse under ₹2,000";
   if (scenarioId === 'tier1') {
-    goal = "Find me an ergonomic wireless mouse under $30";
+    goal = "Find me an ergonomic wireless mouse under ₹2,000";
   } else if (scenarioId === 'tier2') {
     goal = "Buy me a Keychron mechanical keyboard";
   } else if (scenarioId === 'injection') {

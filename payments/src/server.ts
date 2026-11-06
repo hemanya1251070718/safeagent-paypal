@@ -24,9 +24,10 @@ function broadcastSSE(event: any) {
 // Seed initial ledger state
 ledger.append('MANDATE_CREATED', {
   mandateId: 'mandate_active_001',
-  maxSpend: 100.0,
-  tier1Limit: 30.0,
-  whitelist: ['Shopify-TechStore', 'Medusa-OfficePro']
+  maxSpend: 15000.0,
+  tier1Limit: 2500.0,
+  currency: 'INR',
+  whitelist: ['Shopify-India', 'Croma-Retail', 'Reliance-Digital', 'Shopify-TechStore', 'Medusa-OfficePro']
 }, 'mandate_active_001');
 
 // Health Check

@@ -12,6 +12,7 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({ mandateId, onBiome
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [trace, setTrace] = useState<any[]>([]);
   const [finalStatus, setFinalStatus] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const executeGoal = async (customGoal?: string, scenarioId?: string) => {
     const targetGoal = customGoal || goal;
@@ -20,6 +21,7 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({ mandateId, onBiome
     setIsLoading(true);
     setTrace([]);
     setFinalStatus(null);
+    setErrorMessage(null);
 
     try {
       let response;
@@ -41,7 +43,9 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({ mandateId, onBiome
         onBiometricRequired(response.data.intent || response.data.gatewayDecision.intent);
       }
     } catch (err: any) {
-      console.error(err);
+      console.error("Agent execution error:", err);
+      const msg = err.response?.data?.error || err.message || 'Agent service connection failed on port 4001';
+      setErrorMessage(`Execution error: ${msg}. Make sure SafeAgent services are started.`);
       setFinalStatus('ERROR');
     } finally {
       setIsLoading(false);
@@ -74,7 +78,7 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({ mandateId, onBiome
             <ArrowRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
           <div className="text-[11px] text-slate-300 font-medium truncate">Tier 1 Micro-Tx</div>
-          <div className="text-[9px] text-slate-500">Wireless mouse &lt; $30 (Auto)</div>
+          <div className="text-[9px] text-slate-500">Wireless mouse &lt; ₹2,500 (Auto)</div>
         </button>
 
         <button
@@ -87,7 +91,7 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({ mandateId, onBiome
             <ArrowRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
           <div className="text-[11px] text-slate-300 font-medium truncate">Tier 2 Discretionary</div>
-          <div className="text-[9px] text-slate-500">Keyboard (Biometric 1-tap)</div>
+          <div className="text-[9px] text-slate-500">Keychron Keyboard (Biometric)</div>
         </button>
 
         <button
@@ -113,23 +117,32 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({ mandateId, onBiome
             <ArrowRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
           <div className="text-[11px] text-slate-300 font-medium truncate">Budget Recovery</div>
-          <div className="text-[9px] text-slate-500">Rejection adaptation</div>
+          <div className="text-[9px] text-slate-500">Rejection adaptation (INR)</div>
         </button>
       </div>
 
+      {/* Error Alert Banner */}
+      {errorMessage && (
+        <div className="mb-3 p-3 rounded-xl bg-red-950/80 border border-red-500/50 text-red-300 text-xs flex items-center space-x-2">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-red-400" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
+
       {/* Reasoning Trace Log */}
       <div className="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-3 overflow-y-auto font-mono text-xs space-y-2 mb-4">
-        {trace.length === 0 && !isLoading && (
+        {trace.length === 0 && !isLoading && !errorMessage && (
           <div className="h-full flex flex-col items-center justify-center text-slate-500">
             <Bot className="h-8 w-8 mb-2 opacity-40" />
             <p className="text-xs">Select a scenario preset or type a natural language shopping goal below.</p>
+            <p className="text-[10px] text-slate-600 mt-1">E.g. "find me a brand new iphone 17 pro max" or "mechanical keyboard"</p>
           </div>
         )}
 
         {isLoading && (
           <div className="flex items-center space-x-2 text-cyan-400 p-2 animate-pulse">
             <Sparkles className="h-4 w-4" />
-            <span>Agent parsing goal, querying merchant catalogs, and composing intent...</span>
+            <span>Agent parsing goal in INR, querying merchant catalogs, and composing intent...</span>
           </div>
         )}
 
@@ -157,7 +170,7 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({ mandateId, onBiome
           type="text"
           value={goal}
           onChange={(e) => setGoal(e.target.value)}
-          placeholder="E.g. 'Find me an ergonomic mouse under $30' or 'Buy a fast charger'..."
+          placeholder="E.g. 'find me a brand new iphone 17 pro max' or 'mouse under ₹2,000'..."
           disabled={isLoading}
           className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
           onKeyDown={(e) => e.key === 'Enter' && executeGoal()}
