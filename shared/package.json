@@ -1,0 +1,16 @@
+{
+  "name": "safeagent-shared",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@noble/post-quantum": "^0.5.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}
+

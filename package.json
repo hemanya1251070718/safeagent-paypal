@@ -1,0 +1,23 @@
+{
+  "name": "safeagent",
+  "version": "1.0.0",
+  "description": "SafeAgent: Deterministic, Policy-Guarded Financial Proxy for Autonomous AI Agents on PayPal Rails",
+  "private": true,
+  "scripts": {
+    "start:agent": "cd agent && npm run dev",
+    "start:gateway": "cd gateway && npm run dev",
+    "start:payments": "cd payments && npm run dev",
+    "start:client": "cd client && npm run dev"
+  },
+  "keywords": [
+    "paypal",
+    "ai-agent",
+    "agentic-commerce",
+    "post-quantum-cryptography",
+    "ml-dsa",
+    "ag-grid",
+    "hackathon"
+  ],
+  "author": "SafeAgent Team",
+  "license": "Apache-2.0"
+}
