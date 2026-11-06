@@ -1,0 +1,56 @@
+services:
+  # Layer 3: Policy Proxy Gateway
+  - type: web
+    name: safeagent-gateway
+    env: node
+    plan: free
+    buildCommand: npm install && cd shared && npm install && npm run build && cd ../gateway && npm install && npm run build
+    startCommand: cd gateway && node dist/server.js
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: NODE_ENV
+        value: production
+      - key: PAYMENTS_SERVICE_URL
+        sync: false
+      - key: FRONTEND_ORIGIN
+        sync: false
+
+  # Layer 4: Payments & Telemetry Service
+  - type: web
+    name: safeagent-payments
+    env: node
+    plan: free
+    buildCommand: npm install && cd shared && npm install && npm run build && cd ../payments && npm install && npm run build
+    startCommand: cd payments && node dist/server.js
+    envVars:
+      - key: PORT
+        value: 5000
+      - key: NODE_ENV
+        value: production
+      - key: PAYPAL_MODE
+        value: sandbox
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+
+  # Layer 2: Cognitive Agent Service
+  - type: web
+    name: safeagent-agent
+    env: node
+    plan: free
+    buildCommand: npm install && cd shared && npm install && npm run build && cd ../agent && npm install && npm run build
+    startCommand: cd agent && node dist/service.js
+    envVars:
+      - key: PORT
+        value: 4001
+      - key: NODE_ENV
+        value: production
+      - key: GATEWAY_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+

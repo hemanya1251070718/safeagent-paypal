@@ -1,0 +1,133 @@
+{
+  "info": {
+    "name": "SafeAgent API Collection - PayPal AI Hackathon",
+    "description": "Complete test suite for SafeAgent: Policy Gateway, Cognitive Agent, and PayPal Payments Rails.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Gateway (P3)",
+      "item": [
+        {
+          "name": "1. Gateway Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "http://localhost:3000/health"
+          }
+        },
+        {
+          "name": "2. Register Spending Mandate (PQC Signed)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mandate\": {\n    \"mandateId\": \"mandate_postman_001\",\n    \"userId\": \"user_postman\",\n    \"maxSpend\": 100.0,\n    \"currency\": \"USD\",\n    \"ttlHours\": 24,\n    \"createdAt\": 1793977000000,\n    \"expiresAt\": 1794063400000,\n    \"merchantWhitelist\": [\"Shopify-TechStore\", \"Medusa-OfficePro\"],\n    \"tier1Limit\": 30.0,\n    \"remainingBalance\": 100.0,\n    \"nonce\": \"nonce_pqc_991\"\n  }\n}"
+            },
+            "url": "http://localhost:3000/mandates"
+          }
+        },
+        {
+          "name": "3. Evaluate Intent - Tier 1 Micro-Tx (Auto-Approved)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"intentId\": \"intent_test_tier1\",\n  \"mandateId\": \"mandate_active_001\",\n  \"merchant\": \"Shopify-TechStore\",\n  \"items\": [{\n    \"id\": \"TECH-101\",\n    \"name\": \"Anker Ergonomic Wireless Mouse\",\n    \"price\": 24.99,\n    \"quantity\": 1\n  }],\n  \"subtotal\": 24.99,\n  \"tax\": 2.00,\n  \"total\": 26.99,\n  \"currency\": \"USD\",\n  \"nonce\": \"nonce_unique_101\",\n  \"agentReasoning\": \"Selected mouse within budget\"\n}"
+            },
+            "url": "http://localhost:3000/intents"
+          }
+        },
+        {
+          "name": "4. Evaluate Intent - Tier 2 (Biometric Required)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"intentId\": \"intent_test_tier2\",\n  \"mandateId\": \"mandate_active_001\",\n  \"merchant\": \"Shopify-TechStore\",\n  \"items\": [{\n    \"id\": \"TECH-102\",\n    \"name\": \"Keychron K2 Mechanical Keyboard\",\n    \"price\": 79.99,\n    \"quantity\": 1\n  }],\n  \"subtotal\": 79.99,\n  \"tax\": 6.40,\n  \"total\": 86.39,\n  \"currency\": \"USD\",\n  \"nonce\": \"nonce_unique_102\",\n  \"agentReasoning\": \"Selected keyboard for coding\"\n}"
+            },
+            "url": "http://localhost:3000/intents"
+          }
+        },
+        {
+          "name": "5. Biometric Confirmation (Two-Phase Commit)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"approved\": true,\n  \"authMethod\": \"WebAuthn_Passkey\"\n}"
+            },
+            "url": "http://localhost:3000/intents/intent_test_tier2/confirm"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cognitive Agent (P2)",
+      "item": [
+        {
+          "name": "1. Plan Shopping Goal (Natural Language)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"goal\": \"Find me an ergonomic mouse under $30\",\n  \"mandateId\": \"mandate_active_001\"\n}"
+            },
+            "url": "http://localhost:4001/agent/plan"
+          }
+        },
+        {
+          "name": "2. Trigger Prompt-Injection Attack Test",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mandateId\": \"mandate_active_001\"\n}"
+            },
+            "url": "http://localhost:4001/agent/scenario/injection"
+          }
+        },
+        {
+          "name": "3. Inspect Merchant Product Catalog",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "http://localhost:4001/agent/catalog"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payments & Telemetry (P4)",
+      "item": [
+        {
+          "name": "1. Get Full Hash-Chained Immutable Ledger",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "http://localhost:5000/ledger/events"
+          }
+        },
+        {
+          "name": "2. Ingest PayPal Capture Webhook",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_type\": \"PAYMENT.CAPTURE.COMPLETED\",\n  \"resource\": {\n    \"id\": \"CAP-12345678\",\n    \"status\": \"COMPLETED\",\n    \"amount\": {\n      \"value\": \"26.99\",\n      \"currency_code\": \"USD\"\n    }\n  }\n}"
+            },
+            "url": "http://localhost:5000/webhooks/paypal"
+          }
+        }
+      ]
+    }
+  ]
+}
+
