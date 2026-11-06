@@ -5,42 +5,25 @@
 
 ---
 
-## 1. Executive Summary & Vision
+## 1. About SafeAgent
 
-**SafeAgent** is a deterministic, policy-guarded financial proxy and middleware designed to enable autonomous AI agents (such as Claude 3.5 Sonnet, GPT-4o, and Llama 3) to execute end-to-end commerce safely.
+**SafeAgent** is a deterministic, policy-guarded financial middleware and autonomous agent proxy built for the **PayPal AI Hackathon: *"Build What's Next with PayPal and AI"***.
 
-The architecture decouples cognitive reasoning from financial authority:
-* **The LLM is an untrusted cognitive planner:** It performs semantic discovery, price comparison, and cart composition. It holds **no payment credentials** and has **no payment execution tools**.
-* **The Policy Gateway is the deterministic gatekeeper:** It mathematically enforces cryptographic spending mandates signed upfront by the human user with **NIST FIPS 204 (ML-DSA / Dilithium) Post-Quantum Cryptography** before touching PayPal's payment rails.
+It solves the single greatest vulnerability blocking real-world agentic commerce: **giving untrusted LLMs direct access to persistent payment credentials.** 
 
-```
-┌──────────────────┐       Natural Language Goal       ┌────────────────────────┐
-│    Human User    │ ────────────────────────────────> │   Cognitive Agent      │
-│  (React + PQC)   │                                   │ (Claude / GPT / Llama) │
-└────────┬─────────┘                                   └───────────┬────────────┘
-         │                                                         │
-         │ Signed Mandate                                          │ Checkout Intent
-         │ (Max $100, Whitelist, TTL)                              │ (Mouse $24.99)
-         ▼                                                         ▼
-┌───────────────────────────────────────────────────────────────────────────────┐
-│                    POLICY PROXY GATEWAY (Deterministic)                       │
-│   • Verifies ML-DSA Signature    • Enforces Budget & Whitelist Limits         │
-│   • Sanitizes Prompt Injections  • Decides Tier 1 vs Tier 2 Execution        │
-└──────────────────────────────────────┬────────────────────────────────────────┘
-                                       │ Validated & Authorized
-                                       ▼
-                     ┌───────────────────────────────────┐
-                     │     PayPal Rails (Orders v2)      │
-                     │  • Vaulted Capture (Tier 1)       │
-                     │  • Biometric Capture (Tier 2)     │
-                     └─────────────────┬─────────────────┘
-                                       │ Webhooks
-                                       ▼
-                     ┌───────────────────────────────────┐
-                     │    Real-Time AG Grid Dashboard    │
-                     │    & Merkle Dispute Package       │
-                     └───────────────────────────────────┘
-```
+Instead of trusting probabilistic AI models with raw payment tokens or credit cards, SafeAgent enforces an uncompromising architectural decoupling:
+* **Untrusted Cognitive Planner (Agent / P2):** Autonomous LLM (powered by Google Gemini 3.8 Flash + Model Context Protocol) that interprets natural language shopping requests, searches multi-merchant catalogs using dense vector semantic embeddings, verifies product inventory, and calculates sales taxes. **The agent holds ZERO payment credentials and has no execution authority.**
+* **Deterministic Policy Gateway (Gateway / P3):** A hardened cryptographic gatekeeper that validates digital spending mandates signed client-side using **NIST FIPS 204 (ML-DSA / Dilithium) Post-Quantum Cryptography (PQC)**. It deterministically enforces budget caps, expiration TTLs, merchant whitelists, single-use replay nonces, and sanitizes indirect prompt injections before staging any financial action.
+* **Settlement & Audit Layer (Payments / P4):** Translates validated mandates into live **PayPal Orders v2** captures, executes unattended zero-touch micro-transactions ($\le \$30$) via **PayPal Vault**, verifies PayPal webhooks, and immutably anchors every state change to an append-only SHA-256 hash-chained ledger streaming real-time telemetry to an **AG Grid Enterprise** dashboard.
+
+---
+
+### System Architecture Diagram
+
+![SafeAgent Complete System Architecture](assets/architecture-diagram.png)
+*Visual architecture mapping component interactions across User Console (P1), Shopping Agent (P2), Policy Gateway (P3), and PayPal Settlement (P4) ([gitdiagram.com/hemanya1251070718/safeagent-paypal](https://gitdiagram.com/hemanya1251070718/safeagent-paypal)).*
+
+---
 
 ---
 
