@@ -68,7 +68,19 @@ export async function runGeminiPlanner(
       properties: {
         mandateId: { type: SchemaType.STRING },
         merchant: { type: SchemaType.STRING },
-        items: { type: SchemaType.ARRAY, items: { type: SchemaType.OBJECT } },
+        items: {
+          type: SchemaType.ARRAY,
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              id: { type: SchemaType.STRING },
+              name: { type: SchemaType.STRING },
+              price: { type: SchemaType.NUMBER },
+              quantity: { type: SchemaType.INTEGER }
+            },
+            required: ["id", "name", "price", "quantity"]
+          }
+        },
         subtotal: { type: SchemaType.NUMBER },
         tax: { type: SchemaType.NUMBER },
         total: { type: SchemaType.NUMBER },
