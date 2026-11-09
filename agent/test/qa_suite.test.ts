@@ -442,20 +442,18 @@ export async function runQASuite(): Promise<TestResult[]> {
 
   // TC-INT-03: MCP Server get_product_details handler awaits async execution
   try {
-    const rawResult: any = executeGetProductDetails({ productId: "TECH-101" });
-    const isPromise = rawResult && typeof rawResult.then === 'function';
-    const serialized = JSON.stringify(rawResult);
-    // If not awaited, JSON.stringify(rawResult) === "{}"
-    const unawaitedPromiseBug = isPromise && serialized === "{}";
+    const fs = await import('fs');
+    const mcpContent = fs.readFileSync('agent/src/core/mcpServer.ts', 'utf-8');
+    const hasAwait = mcpContent.includes('await executeGetProductDetails');
     record({
       id: "TC-INT-03",
       reqId: "REQ-05",
       name: "MCP tool get_product_details handler awaits async function",
       category: "INTEGRATION BOUNDARIES",
-      status: unawaitedPromiseBug ? "FAIL" : "PASS",
-      expected: "Tool handler awaits executeGetProductDetails so it does not serialize to '{}'",
-      actual: unawaitedPromiseBug ? "executeGetProductDetails returns a Promise; serializing without await outputs empty '{}'" : "Properly awaited",
-      evidence: `executeGetProductDetails returns Promise: ${isPromise}; JSON.stringify(Promise)='${serialized}'`
+      status: hasAwait ? "PASS" : "FAIL",
+      expected: "Tool handler in mcpServer.ts awaits executeGetProductDetails before JSON.stringify",
+      actual: hasAwait ? "executeGetProductDetails is properly awaited" : "executeGetProductDetails is called without await (serializes to '{}')",
+      evidence: hasAwait ? "Found: 'await executeGetProductDetails'" : "Missing await keyword in mcpServer.ts"
     });
   } catch (err: any) {
     record({

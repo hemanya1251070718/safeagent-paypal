@@ -44,7 +44,7 @@ server.tool(
     productId: z.string().describe("Merchant SKU or Product ID (e.g. TECH-101)")
   },
   async ({ productId }) => {
-    const result = executeGetProductDetails({ productId });
+    const result = await executeGetProductDetails({ productId });
     return {
       content: [
         {
