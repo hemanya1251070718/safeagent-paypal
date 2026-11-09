@@ -80,22 +80,26 @@ export async function executeSubmitIntent(input: SubmitIntentInput, gatewayUrl: 
       };
     }
 
-    if (input.total > 100.0) {
+    const maxSpendCap = input.currency === 'INR' ? 15000.0 : 100.0;
+    const tier1Limit = input.currency === 'INR' ? 2500.0 : 30.0;
+    const sym = input.currency === 'INR' ? '₹' : '$';
+
+    if (input.total > maxSpendCap) {
       return {
         status: "REJECTED_BY_GATEWAY",
         policyDecision: "REJECTED",
         tier: 3,
-        reason: `BUDGET_EXCEEDED: Intent total ($${input.total}) exceeds active mandate max spend ($100.00).`,
+        reason: `BUDGET_EXCEEDED: Intent total (${sym}${input.total}) exceeds active mandate max spend (${sym}${maxSpendCap.toLocaleString('en-IN')}).`,
         intent: intentPayload
       };
     }
 
-    if (input.total > 30.0) {
+    if (input.total > tier1Limit) {
       return {
         status: "HELD_FOR_CONFIRMATION",
         policyDecision: "CONFIRMATION_REQUIRED",
         tier: 2,
-        reason: `DISCRETIONARY_TIER: Cart total ($${input.total}) exceeds Tier 1 zero-touch threshold ($30.00). Two-phase commit paused for user biometric approval.`,
+        reason: `DISCRETIONARY_TIER: Cart total (${sym}${input.total}) exceeds Tier 1 zero-touch threshold (${sym}${tier1Limit.toLocaleString('en-IN')}). Two-phase commit paused for user biometric approval.`,
         intent: intentPayload
       };
     }
@@ -104,7 +108,7 @@ export async function executeSubmitIntent(input: SubmitIntentInput, gatewayUrl: 
       status: "ACCEPTED_AND_CAPTURED",
       policyDecision: "APPROVED",
       tier: 1,
-      reason: `TIER_1_AUTO_EXECUTION: Cart total ($${input.total}) is within $30.00 zero-touch threshold. Captured server-to-server via PayPal Vault.`,
+      reason: `TIER_1_AUTO_EXECUTION: Cart total (${sym}${input.total}) is within ${sym}${tier1Limit.toLocaleString('en-IN')} zero-touch threshold. Captured server-to-server via PayPal Vault.`,
       intent: intentPayload
     };
   }
