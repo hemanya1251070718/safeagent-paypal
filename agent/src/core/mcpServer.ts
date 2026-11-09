@@ -59,7 +59,7 @@ server.tool(
 // Tool 3: build_cart
 server.tool(
   "build_cart",
-  "Validate merchant inventory, calculate sales tax (8%), and construct a deterministic cart",
+  "Validate merchant inventory, calculate 18% GST, and construct a deterministic cart",
   {
     items: z.array(
       z.object({
@@ -96,10 +96,10 @@ server.tool(
         quantity: z.number()
       })
     ).describe("Cart items to submit"),
-    subtotal: z.number().describe("Subtotal amount in USD"),
-    tax: z.number().describe("Calculated tax amount in USD"),
+    subtotal: z.number().describe("Subtotal amount in INR"),
+    tax: z.number().describe("Calculated 18% GST tax amount in INR"),
     total: z.number().describe("Total amount matching cart validation"),
-    currency: z.string().default("USD").describe("Currency code"),
+    currency: z.string().default("INR").describe("Currency code"),
     agentReasoning: z.string().describe("Explanation for autonomous choice"),
     gatewayUrl: z.string().optional().describe("Override gateway URL (default http://localhost:3000)")
   },
@@ -145,7 +145,7 @@ server.prompt(
   "autonomous-procurement",
   {
     userGoal: z.string().describe("User shopping instruction"),
-    mandateBudget: z.string().describe("Authorized spending mandate limit")
+    mandateBudget: z.string().describe("Authorized spending mandate limit in INR")
   },
   ({ userGoal, mandateBudget }) => ({
     messages: [
@@ -153,7 +153,7 @@ server.prompt(
         role: "user",
         content: {
           type: "text",
-          text: `You are SafeAgent autonomous procurement assistant. The user wants: "${userGoal}". The signed mandate budget cap is $${mandateBudget}. Find the best matching item, build a verified cart, and submit checkout intent through the SafeAgent Gateway. Never exceed the mandate.`
+          text: `You are SafeAgent autonomous procurement assistant. The user wants: "${userGoal}". The signed mandate budget cap is ₹${mandateBudget}. Find the best matching item, build a verified cart, and submit checkout intent through the SafeAgent Gateway. Never exceed the mandate.`
         }
       }
     ]

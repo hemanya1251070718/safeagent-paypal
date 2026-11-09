@@ -17,7 +17,7 @@ export const searchProductsToolDefinition = {
     type: "object",
     properties: {
       query: { type: "string", description: "Search query or natural language description (e.g. 'ergonomic wireless pointing device' or 'mechanical keyboard')" },
-      maxPrice: { type: "number", description: "Maximum price filter in USD" },
+      maxPrice: { type: "number", description: "Maximum price filter in INR" },
       category: { type: "string", description: "Product category (e.g. 'accessories', 'hardware', 'office')" },
       merchant: { type: "string", description: "Specific merchant store name" },
       semantic: { type: "boolean", description: "Enable vector semantic embedding search (defaults to true)" }
