@@ -46,6 +46,10 @@ export async function executeBuildCart(input: BuildCartInput) {
   let orderCurrency = "INR";
 
   for (const item of input.items) {
+    if (typeof item.quantity !== 'number' || !Number.isInteger(item.quantity) || item.quantity <= 0) {
+      return { error: `Invalid quantity '${item.quantity}' for item '${item.productId}'. Quantity must be a positive integer.` };
+    }
+
     const product = storeService.getById(item.productId);
     if (!product) {
       return { error: `Product '${item.productId}' not found in catalog.` };
