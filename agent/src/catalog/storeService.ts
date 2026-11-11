@@ -17,9 +17,9 @@ export class StoreService {
     // Sanitize punctuation so searches like "Puma Velocity NITRO 3 (₹7,499, Myntra)" parse cleanly
     const sanitizedQuery = q.replace(/[\(\)\[\]\{\}",'₹\$]/g, ' ');
     const rawKeywords = sanitizedQuery.split(/\s+/).filter(k => k.length > 0);
-    // Filter out stop words unless all keywords are stop words
-    const keywords = rawKeywords.filter(k => !STOP_WORDS.has(k) && isNaN(Number(k)));
-    const activeKeywords = keywords.length > 0 ? keywords : rawKeywords;
+    // Filter out stop words and single-letter characters (e.g. 'x' in 'Puma x Collab')
+    const keywords = rawKeywords.filter(k => !STOP_WORDS.has(k) && isNaN(Number(k)) && k.length > 1);
+    const activeKeywords = keywords.length > 0 ? keywords : rawKeywords.filter(k => k.length > 1);
 
     const matched = this.products.map(product => {
       // Stock filter
@@ -53,9 +53,10 @@ export class StoreService {
       const lowerTags = product.tags.map(t => t.toLowerCase());
 
       for (const kw of activeKeywords) {
-        if (lowerName.includes(kw)) score += 10;
-        if (lowerTags.some(t => t.includes(kw))) score += 5;
-        if (lowerDesc.includes(kw)) score += 2;
+        const wordRegex = new RegExp(`\\b${kw}`, 'i');
+        if (wordRegex.test(lowerName)) score += 10;
+        if (lowerTags.some(t => t === kw || t.startsWith(kw))) score += 5;
+        if (wordRegex.test(lowerDesc)) score += 2;
       }
 
       return { product, score };

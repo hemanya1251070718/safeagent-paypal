@@ -15,7 +15,8 @@ import {
   ChevronDown,
   ChevronUp,
   Brain,
-  HelpCircle
+  HelpCircle,
+  AlertCircle
 } from 'lucide-react';
 import { dispatchPlan, triggerScenario } from '../services/api';
 import { extractIntentCart, formatTime } from '../utils/formatters';
@@ -47,6 +48,10 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
     merchant?: string;
     isAttack?: boolean;
   } | null>(null);
+  const [unmatchedNotice, setUnmatchedNotice] = useState<{
+    goal: string;
+    reason?: string;
+  } | null>(null);
 
   const traceContainerRef = useRef<HTMLDivElement>(null);
   const traceBottomRef = useRef<HTMLDivElement>(null);
@@ -77,6 +82,7 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
     setFinalStatus(null);
     setErrorMessage(null);
     setBlockedNotice(null);
+    setUnmatchedNotice(null);
     setExpandedPayloads({});
   };
 
@@ -96,6 +102,7 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
     setFinalStatus(null);
     setErrorMessage(null);
     setBlockedNotice(null);
+    setUnmatchedNotice(null);
     setExpandedPayloads({});
 
     try {
@@ -180,6 +187,14 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
           gatewayDecision: response.gatewayDecision,
           finalStatus: response.finalStatus,
           timestamp: Date.now()
+        });
+      } else if (
+        response.finalStatus === 'UNMATCHED_INTENT' ||
+        response.finalStatus === 'NO_PRODUCTS_FOUND'
+      ) {
+        setUnmatchedNotice({
+          goal: targetGoal,
+          reason: response.error || 'Requested item is not available in approved merchant inventories.'
         });
       } else if (
         response.finalStatus === 'ACCEPTED_AND_CAPTURED' ||
@@ -324,12 +339,31 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
         </div>
       )}
 
+      {/* Unmatched Intent / Relevance Floor Callout Card */}
+      {unmatchedNotice && (
+        <div className="mb-3 p-3.5 rounded-xl bg-amber-950/80 border border-amber-500/70 text-amber-200 text-xs space-y-2 animate-in fade-in shadow-lg shadow-amber-950/50">
+          <div className="flex items-center justify-between">
+            <span className="font-bold flex items-center gap-1.5 text-amber-400 text-xs">
+              <AlertCircle className="h-4 w-4 text-amber-400" />
+              <span>Shopping Intent Unmatched (Zero Funds Captured)</span>
+            </span>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+              Relevance Guardrail Active
+            </span>
+          </div>
+
+          <div className="text-[11px] text-amber-300/90 leading-relaxed">
+            No verified items matching <strong className="text-white">"{unmatchedNotice.goal}"</strong> were found in approved merchant stores. SafeAgent halted cart execution to protect your wallet from unintended purchases.
+          </div>
+        </div>
+      )}
+
       {/* Reasoning Trace Log Container */}
       <div
         ref={traceContainerRef}
         className="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-3 overflow-y-auto font-mono text-xs space-y-2 mb-3"
       >
-        {trace.length === 0 && !isLoading && !errorMessage && !blockedNotice && (
+        {trace.length === 0 && !isLoading && !errorMessage && !blockedNotice && !unmatchedNotice && (
           <div className="h-full flex flex-col items-center justify-center text-slate-500">
             <Bot className="h-8 w-8 mb-2 opacity-40" />
             <p className="text-xs">Select a scenario preset or type a natural language shopping goal below.</p>
