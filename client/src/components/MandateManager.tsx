@@ -132,6 +132,33 @@ export const MandateManager: React.FC<MandateManagerProps> = ({
 
   // Cryptographic In-Browser ML-DSA-65 Signing Routine (DO NOT MODIFY)
   const handleGenerateAndSign = async () => {
+    if (!maxSpend || maxSpend <= 0) {
+      showToast({
+        type: 'error',
+        title: 'Invalid Spend Ceiling',
+        message: 'Please enter a valid Max Spend Ceiling greater than zero.'
+      });
+      return;
+    }
+
+    if (tier1Limit < 0) {
+      showToast({
+        type: 'error',
+        title: 'Invalid Tier 1 Threshold',
+        message: 'Tier 1 threshold must be non-negative.'
+      });
+      return;
+    }
+
+    if (tier1Limit > maxSpend) {
+      showToast({
+        type: 'error',
+        title: 'Threshold Exceeds Ceiling',
+        message: `Tier 1 auto-approve threshold (${formatCurrency(tier1Limit, MANDATE_CURRENCY)}) cannot exceed Max Spend ceiling (${formatCurrency(maxSpend, MANDATE_CURRENCY)}).`
+      });
+      return;
+    }
+
     setIsSigning(true);
     setStatus('GENERATING_PQC_KEYPAIR');
 
@@ -252,44 +279,120 @@ export const MandateManager: React.FC<MandateManagerProps> = ({
           <span className="text-[11px] text-slate-400">Policy Guarded</span>
         </div>
 
-        {/* Sliders: Max Spend & Tier 1 Limit */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
-          <div>
+        {/* Manual Tier Constraints Input (Replaces Range Sliders) */}
+        <div className="space-y-4 mb-5">
+          {/* Max Spend Ceiling Input (Tier 3 Hard Stop) */}
+          <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80">
             <div className="flex justify-between items-center mb-1.5">
-              <label className="text-xs font-semibold text-slate-300">Max Spend Ceiling:</label>
+              <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-blue-500"></span>
+                <span>Max Spend Ceiling (Hard Stop):</span>
+              </label>
               <span className="text-blue-400 font-mono text-xs font-bold">
                 {formatCurrency(maxSpend, MANDATE_CURRENCY)}
               </span>
             </div>
-            <input
-              type="range"
-              min="1000"
-              max="50000"
-              step="500"
-              value={maxSpend}
-              onChange={(e) => setMaxSpend(parseFloat(e.target.value))}
-              className="w-full accent-blue-500 cursor-pointer"
-            />
-            <span className="text-[10px] text-slate-500">Hard stop ceiling. Intents above this are blocked.</span>
+            <div className="relative flex items-center mb-2">
+              <span className="absolute left-3 text-slate-400 font-mono text-xs font-semibold">₹</span>
+              <input
+                type="number"
+                min="500"
+                max="1000000"
+                step="500"
+                value={maxSpend === 0 ? '' : maxSpend}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  setMaxSpend(isNaN(val) ? 0 : val);
+                }}
+                placeholder="Enter max spend limit (e.g. 50000)"
+                className="w-full pl-7 pr-3 py-2 bg-slate-900/90 border border-slate-700/80 rounded-lg font-mono text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
+              />
+            </div>
+            {/* Quick preset buttons */}
+            <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+              <span className="text-[10px] text-slate-400 mr-1">Presets:</span>
+              {[15000, 30000, 50000, 100000, 200000].map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setMaxSpend(preset)}
+                  className={`text-[10px] font-mono px-2 py-0.5 rounded border transition ${
+                    maxSpend === preset
+                      ? 'bg-blue-600/30 border-blue-500 text-blue-300 font-bold'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                  }`}
+                >
+                  ₹{(preset / 1000).toFixed(0)}k
+                </button>
+              ))}
+            </div>
+            <span className="text-[10px] text-slate-500 block leading-tight">
+              Tier 3 Hard Stop ceiling: Any intent exceeding this amount is deterministically rejected.
+            </span>
           </div>
 
-          <div>
+          {/* Tier 1 Auto-Approve Limit Input */}
+          <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80">
             <div className="flex justify-between items-center mb-1.5">
-              <label className="text-xs font-semibold text-slate-300">Tier 1 Auto-Approve:</label>
+              <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+                <span>Tier 1 Auto-Approve Threshold:</span>
+              </label>
               <span className="text-emerald-400 font-mono text-xs font-bold">
                 {formatCurrency(tier1Limit, MANDATE_CURRENCY)}
               </span>
             </div>
-            <input
-              type="range"
-              min="500"
-              max="10000"
-              step="250"
-              value={tier1Limit}
-              onChange={(e) => setTier1Limit(parseFloat(e.target.value))}
-              className="w-full accent-emerald-500 cursor-pointer"
-            />
-            <span className="text-[10px] text-slate-500">Zero-touch micro-transactions under this auto-settle.</span>
+            <div className="relative flex items-center mb-2">
+              <span className="absolute left-3 text-slate-400 font-mono text-xs font-semibold">₹</span>
+              <input
+                type="number"
+                min="0"
+                max={maxSpend > 0 ? maxSpend : 50000}
+                step="250"
+                value={tier1Limit === 0 ? '' : tier1Limit}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  setTier1Limit(isNaN(val) ? 0 : val);
+                }}
+                placeholder="Enter micro-spend threshold (e.g. 2500)"
+                className="w-full pl-7 pr-3 py-2 bg-slate-900/90 border border-slate-700/80 rounded-lg font-mono text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+              />
+            </div>
+            {/* Quick preset buttons */}
+            <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+              <span className="text-[10px] text-slate-400 mr-1">Presets:</span>
+              {[1000, 2500, 5000, 6500, 10000].map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setTier1Limit(preset)}
+                  className={`text-[10px] font-mono px-2 py-0.5 rounded border transition ${
+                    tier1Limit === preset
+                      ? 'bg-emerald-600/30 border-emerald-500 text-emerald-300 font-bold'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                  }`}
+                >
+                  ₹{preset >= 1000 ? `${(preset / 1000).toFixed(preset % 1000 === 0 ? 0 : 1)}k` : preset}
+                </button>
+              ))}
+            </div>
+            <span className="text-[10px] text-slate-500 block leading-tight">
+              Zero-touch micro-transactions at or under this amount auto-settle without human prompts.
+            </span>
+          </div>
+
+          {/* Tier 2 Discretionary Range Banner */}
+          <div className="px-3 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-[11px]">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-amber-400"></span>
+              <span className="text-amber-300 font-semibold">Tier 2 Discretionary:</span>
+              <span className="font-mono text-slate-300">
+                &gt; {formatCurrency(tier1Limit, MANDATE_CURRENCY)} up to {formatCurrency(maxSpend, MANDATE_CURRENCY)}
+              </span>
+            </div>
+            <span className="text-[10px] text-amber-400/90 font-medium font-mono bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">
+              1-Tap Biometric Required
+            </span>
           </div>
         </div>
 
