@@ -6,7 +6,9 @@
     "build": "tsc",
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
-    "test": "tsx test/security.test.ts"
+    "test": "tsx test/security.test.ts",
+    "test:integration": "tsx test/integration.test.ts",
+    "test:all": "tsx test/security.test.ts && tsx test/integration.test.ts"
   },
   "dependencies": {
     "@noble/post-quantum": "^0.5.2",
