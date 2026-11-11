@@ -132,6 +132,7 @@ export class PayPalService {
   private cachedToken: string | null = null;
   private tokenExpiresAt: number = 0;
   private tokenClientId: string = '';
+  private simSeq: number = 0;
 
   private get clientId(): string {
     return process.env.PAYPAL_CLIENT_ID || '';
@@ -253,14 +254,16 @@ export class PayPalService {
     intent: CheckoutIntent,
     options?: { tier1Limit?: number }
   ): Promise<SettlementResult> {
-    const rawCurrency = (intent.currency || 'USD').toUpperCase();
+    const rawCurrency = (intent.currency || 'USD').trim().toUpperCase();
     const routing = this.determineSettlementRouting(intent, options?.tier1Limit);
 
     if (!this.isConfigured()) {
       // High-fidelity sandbox simulation (keeps original currency)
       const reconciled = reconcileOrderAmounts(intent, rawCurrency, 1);
-      const orderId = `SANDBOX-ORD-${Date.now()}`;
-      const captureId = `SANDBOX-CAP-${Date.now()}`;
+      this.simSeq += 1;
+      const suffix = `${Date.now()}-${this.simSeq}`;
+      const orderId = `SANDBOX-ORD-${suffix}`;
+      const captureId = `SANDBOX-CAP-${suffix}`;
       return {
         mode: 'SIMULATED_SANDBOX',
         tier: routing.tier,
