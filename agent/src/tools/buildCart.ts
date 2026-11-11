@@ -28,7 +28,7 @@ export const buildCartToolDefinition = {
           required: ["productId", "quantity"]
         }
       },
-      taxRatePercent: { type: "number", description: "Optional sales tax percentage (defaults to 8.0%)" }
+      taxRatePercent: { type: "number", description: "Optional sales tax percentage (defaults to 18.0% GST)" }
     },
     required: ["items"]
   }

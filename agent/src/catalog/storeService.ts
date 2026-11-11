@@ -175,7 +175,7 @@ export class StoreService {
         price: calculatedPrice,
         currency: "INR",
         inStock: true,
-        description: `Verified retail listing for ${brand} ${baseNoun} with 100% genuine brand warranty on ${merchant}.`,
+        description: `${brand} ${baseNoun} with official brand warranty, available via verified merchant partner ${merchant}.`,
         tags: [query.toLowerCase(), brand.toLowerCase(), baseNoun.toLowerCase()]
       });
     }

@@ -71,10 +71,12 @@ export async function executeSearchProducts(input: SearchProductsInput) {
       id: m.product.id,
       merchant: m.product.merchant,
       name: m.product.name,
+      category: m.product.category,
       price: m.product.price,
       currency: m.product.currency,
       inStock: m.product.inStock,
       description: m.product.description,
+      tags: m.product.tags,
       matchType: m.matchType,
       relevanceScore: m.score
     }))

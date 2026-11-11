@@ -19,7 +19,7 @@ server.tool(
   "Search merchant catalog with keyword relevance and Gemini semantic embeddings",
   {
     query: z.string().describe("Search query or natural language description"),
-    maxPrice: z.number().optional().describe("Maximum budget cap in USD"),
+    maxPrice: z.number().optional().describe("Maximum budget cap in INR"),
     category: z.string().optional().describe("Category filter: accessories, hardware, office, electronics"),
     merchant: z.string().optional().describe("Target merchant store name")
   },
@@ -69,7 +69,7 @@ server.tool(
     ).describe("Items to place in cart")
   },
   async ({ items }) => {
-    const result = executeBuildCart({ items });
+    const result = await executeBuildCart({ items });
     return {
       content: [
         {

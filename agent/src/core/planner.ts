@@ -24,6 +24,7 @@ export interface PlanExecutionResult {
 
 export class CognitivePlanner {
   private gatewayUrl: string;
+  private static lastGeminiErrorTime: number = 0;
 
   constructor(gatewayUrl: string = process.env.GATEWAY_URL || "http://localhost:3000") {
     this.gatewayUrl = gatewayUrl;
@@ -31,7 +32,10 @@ export class CognitivePlanner {
 
   public async planAndExecute(goal: string, mandateId: string = "mandate_active_001"): Promise<PlanExecutionResult> {
     const geminiApiKey = process.env.GEMINI_API_KEY;
-    if (geminiApiKey && geminiApiKey.trim() !== '' && !geminiApiKey.includes('PASTE_YOUR')) {
+    const now = Date.now();
+    const isCircuitOpen = (now - CognitivePlanner.lastGeminiErrorTime) < 60_000;
+
+    if (geminiApiKey && geminiApiKey.trim() !== '' && !geminiApiKey.includes('PASTE_YOUR') && !isCircuitOpen) {
       try {
         const timeoutPromise = new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error("Gemini live API call timeout (4000ms)")), 4000)
@@ -41,7 +45,8 @@ export class CognitivePlanner {
           timeoutPromise
         ]);
       } catch (err: any) {
-        console.warn(`[Planner] Live Gemini call encountered error (${err.message}). Falling back to autonomous heuristic planner.`);
+        CognitivePlanner.lastGeminiErrorTime = Date.now();
+        console.warn(`[Planner] Live Gemini call encountered error (${err.message}). Circuit breaker active for 60s; falling back to autonomous heuristic planner.`);
       }
     }
 
@@ -141,16 +146,64 @@ export class CognitivePlanner {
     log('GATEWAY_RESPONSE', `Gateway evaluated intent with policy status: ${submission.status}`, submission);
 
     // Step 5: Check if autonomous adaptation is needed (Scenario 4: Budget Recovery)
-    if (submission.policyDecision === 'REJECTED' && submission.reason?.includes('BUDGET_EXCEEDED')) {
+    const isBudgetRejection = submission.policyDecision === 'REJECTED' && (
+      submission.reason?.includes('BUDGET_EXCEEDED') ||
+      submission.reason?.toLowerCase().includes('exceeds remaining mandate balance') ||
+      submission.reason?.toLowerCase().includes('budget') ||
+      submission.reason?.toLowerCase().includes('balance') ||
+      submission.reason?.toLowerCase().includes('max spend')
+    );
+
+    if (isBudgetRejection) {
       log('RECOVERY', `Gateway blocked intent due to budget cap. Initiating autonomous fallback discovery for lower-cost alternatives.`);
       
-      const budgetCategory = lowerGoal.includes("monitor") || lowerGoal.includes("screen") ? "monitor" : (lowerGoal.includes("phone") || lowerGoal.includes("iphone")) ? "accessories" : "accessories";
-      const budgetSearch = await executeSearchProducts({ query: budgetCategory, maxPrice: 8500 });
-      log('TOOL_RESULT', `Budget recovery search returned ${budgetSearch.count} options under budget.`, budgetSearch);
+      // Determine allowed spending ceiling from Gateway feedback or mandate constraints
+      let allowedSpend = 15000.0;
+      const budgetCapMatch = submission.reason?.match(/(?:max spend|balance|limit|cap)\s*(?:\()?(?:₹|rs\.?|inr|\$)?\s*([0-9,]+(?:\.[0-9]+)?)/i);
+      if (budgetCapMatch && budgetCapMatch[1]) {
+        allowedSpend = parseFloat(budgetCapMatch[1].replace(/,/g, ''));
+      } else if (maxBudget) {
+        allowedSpend = maxBudget;
+      }
 
-      if (budgetSearch.count > 0) {
-        const altProduct = budgetSearch.products[0];
-        log('THOUGHT', `Autonomous recovery: Found alternative "${altProduct.name}" for ₹${altProduct.price} ${altProduct.currency}. Composing replacement cart.`);
+      // Pre-tax ceiling taking into account 18% GST (price * 1.18 <= allowedSpend)
+      const maxPreTaxPrice = Math.floor((allowedSpend / 1.18) * 100) / 100;
+
+      // Extract target product domain/category dynamically from the rejected product's tags and category
+      const productTags: string[] = (chosenProduct as any).tags || (details.product as any)?.tags || [];
+      const productCategory: string = (chosenProduct as any).category || (details.product as any)?.category || "accessories";
+
+      let searchKeyword = "";
+      const primaryTag = productTags.find((t: string) => 
+        !['budget', 'cheap', 'flagship', 'luxury', 'expensive', '4k', 'android', '5g', 'apple', 'sony', 'samsung'].includes(t.toLowerCase())
+      );
+      if (primaryTag) {
+        searchKeyword = primaryTag;
+      } else if (productCategory === 'electronics') {
+        searchKeyword = "display";
+      } else {
+        searchKeyword = productCategory;
+      }
+
+      log('THOUGHT', `Autonomous recovery target: Searching for '${searchKeyword}' alternatives priced under pre-tax ceiling ₹${maxPreTaxPrice.toLocaleString('en-IN')} (to ensure total with 18% GST stays under ₹${allowedSpend.toLocaleString('en-IN')}).`);
+
+      let budgetSearch = await executeSearchProducts({ query: searchKeyword, maxPrice: maxPreTaxPrice });
+      // If direct keyword search returned nothing, fall back to product category
+      if (budgetSearch.count === 0 && productCategory) {
+        budgetSearch = await executeSearchProducts({ query: productCategory, category: productCategory, maxPrice: maxPreTaxPrice });
+      }
+
+      // Filter out the over-budget product itself
+      const validAlternatives = budgetSearch.products.filter(p => p.id !== chosenProduct.id && p.price <= maxPreTaxPrice);
+
+      log('TOOL_RESULT', `Budget recovery search discovered ${validAlternatives.length} compliant options within policy limits.`, { count: validAlternatives.length, alternatives: validAlternatives });
+
+      if (validAlternatives.length > 0) {
+        const altProduct = validAlternatives[0];
+        const estTax = Math.round(altProduct.price * 0.18 * 100) / 100;
+        const estTotal = Math.round((altProduct.price + estTax) * 100) / 100;
+
+        log('THOUGHT', `Autonomous recovery decision: Selected compliant alternative "${altProduct.name}" from ${altProduct.merchant} at ₹${altProduct.price.toLocaleString('en-IN')} (Estimated total with 18% GST: ₹${estTotal.toLocaleString('en-IN')} <= ₹${allowedSpend.toLocaleString('en-IN')}). Composing replacement cart.`);
 
         const altCart = await executeBuildCart({
           items: [{ productId: altProduct.id, quantity: 1 }],
@@ -158,7 +211,7 @@ export class CognitivePlanner {
         });
 
         if (altCart.cart) {
-          log('TOOL_CALL', `Resubmitting revised intent with budget alternative: Total=₹${altCart.cart.total}`);
+          log('TOOL_CALL', `Resubmitting revised intent with budget alternative: Total=₹${altCart.cart.total.toLocaleString('en-IN')}`);
           submission = await executeSubmitIntent({
             mandateId,
             merchant: altCart.cart.merchant,
@@ -167,11 +220,13 @@ export class CognitivePlanner {
             tax: altCart.cart.tax,
             total: altCart.cart.total,
             currency: altCart.cart.currency,
-            agentReasoning: `Autonomous recovery: Replaced over-budget item with compliant alternative '${altProduct.name}' (₹${altProduct.price}).`
+            agentReasoning: `Autonomous recovery: Replaced over-budget item '${chosenProduct.name}' with compliant alternative '${altProduct.name}' (₹${altProduct.price} + 18% GST = ₹${altCart.cart.total}).`
           }, this.gatewayUrl);
 
           log('GATEWAY_RESPONSE', `Revised intent evaluation: ${submission.status}`, submission);
         }
+      } else {
+        log('THOUGHT', `Autonomous recovery unable to locate alternative items under budget ceiling ₹${maxPreTaxPrice.toLocaleString('en-IN')}.`);
       }
     }
 

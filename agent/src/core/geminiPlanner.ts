@@ -20,7 +20,7 @@ export async function runGeminiPlanner(
       type: SchemaType.OBJECT,
       properties: {
         query: { type: SchemaType.STRING, description: "Search query or keywords" },
-        maxPrice: { type: SchemaType.NUMBER, description: "Maximum budget filter in USD" }
+        maxPrice: { type: SchemaType.NUMBER, description: "Maximum budget filter in INR" }
       },
       required: ["query"]
     }
@@ -93,8 +93,9 @@ export async function runGeminiPlanner(
 
   const tools: Tool[] = [{ functionDeclarations: [searchDecl, detailsDecl, cartDecl, submitDecl] }];
 
+  const selectedModel = process.env.GEMINI_MODEL || "gemini-1.5-flash";
   const model = genAI.getGenerativeModel({
-    model: "gemini-3.8-flash",
+    model: selectedModel,
     tools,
     systemInstruction: `You are SafeAgent Cognitive Planner (P2), an untrusted autonomous shopping AI.
 Your objective: Fulfill the user's shopping goal within delegated spending boundaries.
@@ -119,7 +120,7 @@ RULES:
     });
   };
 
-  log('THOUGHT', `[Gemini LLM] Connected to Gemini 1.5 Flash. Processing shopping goal: "${goal}" with mandate ${mandateId}.`);
+  log('THOUGHT', `[Gemini LLM] Connected to ${selectedModel}. Processing shopping goal: "${goal}" with mandate ${mandateId}.`);
 
   const chat = model.startChat();
   let promptMsg = `Goal: "${goal}". Active Mandate ID: "${mandateId}". Please find the best item and submit the intent.`;
