@@ -16,7 +16,7 @@ import {
 import { ml_dsa65 } from '@noble/post-quantum/ml-dsa.js';
 import type { SpendingMandate } from '../../../shared/dist/index.js';
 import { bytesToHex, canonicalJsonStringify } from '../../../shared/dist/index.js';
-import { registerMandate } from '../services/api';
+import { registerMandate, getMandate } from '../services/api';
 import { formatCurrency } from '../utils/formatters';
 import { showToast } from './Toast';
 
@@ -26,11 +26,13 @@ const MANDATE_CURRENCY = 'INR';
 interface MandateManagerProps {
   onMandateUpdated: (mandateId: string, mandate?: SpendingMandate) => void;
   activeMandateId?: string;
+  refreshTrigger?: number;
 }
 
 export const MandateManager: React.FC<MandateManagerProps> = ({
   onMandateUpdated,
-  activeMandateId: propActiveMandateId
+  activeMandateId: propActiveMandateId,
+  refreshTrigger
 }) => {
   const [maxSpend, setMaxSpend] = useState<number>(15000.0);
   const [tier1Limit, setTier1Limit] = useState<number>(2500.0);
@@ -64,6 +66,34 @@ export const MandateManager: React.FC<MandateManagerProps> = ({
       setActiveMandateId(propActiveMandateId);
     }
   }, [propActiveMandateId]);
+
+  // Synchronize live mandate state (remaining balance, limits, TTL) from Gateway
+  useEffect(() => {
+    let isSubscribed = true;
+    const syncMandate = async () => {
+      const targetId = propActiveMandateId || activeMandateId;
+      if (!targetId) return;
+      try {
+        const liveMandate = await getMandate(targetId);
+        if (isSubscribed && liveMandate) {
+          setRemainingBalance(liveMandate.remainingBalance);
+          setMaxSpend(liveMandate.maxSpend);
+          setTier1Limit(liveMandate.tier1Limit);
+          setActiveExpiresAt(liveMandate.expiresAt);
+          if (liveMandate.merchantWhitelist && liveMandate.merchantWhitelist.length > 0) {
+            setWhitelistedMerchants(liveMandate.merchantWhitelist);
+          }
+        }
+      } catch (err) {
+        console.warn(`Could not sync live balance for mandate ${targetId}:`, err);
+      }
+    };
+
+    syncMandate();
+    return () => {
+      isSubscribed = false;
+    };
+  }, [propActiveMandateId, activeMandateId, refreshTrigger]);
 
   // Live countdown timer for active mandate expiration
   useEffect(() => {
@@ -204,6 +234,11 @@ export const MandateManager: React.FC<MandateManagerProps> = ({
       setActiveMandateId(mandate.mandateId);
       setActiveExpiresAt(mandate.expiresAt);
       setRemainingBalance(mandate.remainingBalance);
+      try {
+        localStorage.setItem('safeagent_active_mandate_id', mandate.mandateId);
+      } catch (storageErr) {
+        console.warn('Could not persist active mandate to localStorage:', storageErr);
+      }
 
       showToast({
         type: 'success',

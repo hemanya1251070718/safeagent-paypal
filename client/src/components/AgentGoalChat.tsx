@@ -24,6 +24,7 @@ interface AgentGoalChatProps {
   mandateId: string;
   onBiometricRequired: (intent: any) => void;
   onIntentBlocked?: (blocked: any) => void;
+  onOrderCaptured?: () => void;
   externalGoal?: string;
 }
 
@@ -31,6 +32,7 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
   mandateId,
   onBiometricRequired,
   onIntentBlocked,
+  onOrderCaptured,
   externalGoal
 }) => {
   const [goal, setGoal] = useState<string>('');
@@ -179,6 +181,12 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
           finalStatus: response.finalStatus,
           timestamp: Date.now()
         });
+      } else if (
+        response.finalStatus === 'ACCEPTED_AND_CAPTURED' ||
+        response.gatewayDecision?.status === 'ACCEPTED_AND_CAPTURED' ||
+        response.gatewayDecision?.policyDecision === 'APPROVED'
+      ) {
+        onOrderCaptured?.();
       }
     } catch (err: any) {
       console.error('Agent execution error:', err);

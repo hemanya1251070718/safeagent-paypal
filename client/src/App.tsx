@@ -10,12 +10,32 @@ import { ToastContainer } from './components/Toast';
 import { ShieldCheck, Cpu, Zap, Lock } from 'lucide-react';
 
 export const App: React.FC = () => {
-  const [activeMandateId, setActiveMandateId] = useState<string>("mandate_active_001");
+  const [activeMandateId, setActiveMandateId] = useState<string>(() => {
+    try {
+      return localStorage.getItem('safeagent_active_mandate_id') || 'mandate_active_001';
+    } catch {
+      return 'mandate_active_001';
+    }
+  });
   const [activeMandate, setActiveMandate] = useState<SpendingMandate | null>(null);
   const [pendingIntent, setPendingIntent] = useState<any | null>(null);
   const [blockedEvents, setBlockedEvents] = useState<any[]>([]);
   const [isCatalogOpen, setIsCatalogOpen] = useState<boolean>(false);
   const [selectedGoal, setSelectedGoal] = useState<string>('');
+  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+
+  const handleMandateUpdated = (id: string, mandate?: SpendingMandate) => {
+    setActiveMandateId(id);
+    try {
+      localStorage.setItem('safeagent_active_mandate_id', id);
+    } catch (e) {
+      console.warn('Could not save active mandate ID to localStorage:', e);
+    }
+    if (mandate) {
+      setActiveMandate(mandate);
+    }
+    setRefreshTrigger((prev) => prev + 1);
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
@@ -47,12 +67,8 @@ export const App: React.FC = () => {
           <div className="lg:col-span-5">
             <MandateManager
               activeMandateId={activeMandateId}
-              onMandateUpdated={(id, mandate) => {
-                setActiveMandateId(id);
-                if (mandate) {
-                  setActiveMandate(mandate);
-                }
-              }}
+              refreshTrigger={refreshTrigger}
+              onMandateUpdated={handleMandateUpdated}
             />
           </div>
 
@@ -62,6 +78,7 @@ export const App: React.FC = () => {
               externalGoal={selectedGoal}
               onBiometricRequired={(intent) => setPendingIntent(intent)}
               onIntentBlocked={(blocked) => setBlockedEvents((prev) => [blocked, ...prev])}
+              onOrderCaptured={() => setRefreshTrigger((prev) => prev + 1)}
             />
           </div>
         </div>
@@ -85,7 +102,10 @@ export const App: React.FC = () => {
         <BiometricModal
           intent={pendingIntent}
           onClose={() => setPendingIntent(null)}
-          onConfirmed={() => setPendingIntent(null)}
+          onConfirmed={() => {
+            setPendingIntent(null);
+            setRefreshTrigger((prev) => prev + 1);
+          }}
           onRejected={() => setPendingIntent(null)}
         />
       )}
