@@ -59,22 +59,45 @@ Whenever `PAYPAL_CLIENT_ID` or `PAYPAL_CLIENT_SECRET` is empty or left as the `.
 - Tier 2 orders (`total > TIER1_LIMIT`) return `settlementPath: "STANDARD_CAPTURE"`.
 - Simulated settlements are sandbox/demo mocks and **not** real PayPal transactions.
 
-### Live PayPal Sandbox Setup
+### Live PayPal Sandbox Setup & Switching Modes
 > **Verification Status:** Live PayPal Sandbox end-to-end transactions have **not yet been verified** against PayPal's remote servers. Automated tests use mocked PayPal HTTP responses, and local runs default to simulation mode unless valid sandbox credentials are supplied.
 
+#### Required Sandbox Environment Variables
+Set these in `/payments/.env` (copied from `.env.example`; never commit `.env` or real credentials):
+- `PAYPAL_MODE=sandbox`
+- `PAYPAL_BASE_URL=https://api-m.sandbox.paypal.com`
+- `PAYPAL_CLIENT_ID=<your_sandbox_rest_app_client_id>`
+- `PAYPAL_CLIENT_SECRET=<your_sandbox_rest_app_client_secret>`
+- `PAYPAL_WEBHOOK_ID=<your_sandbox_webhook_id>` (required for cryptographic webhook verification via PayPal's API)
+- Optional: `PAYPAL_VAULT_ID=<vaulted_payment_token>` (Tier 1 live vault capture), `TIER1_LIMIT=2500`, `INR_TO_USD=0.012`
+
+#### Obtaining & Configuring Credentials
 1. Log into the PayPal Developer Dashboard (`https://developer.paypal.com/`) -> **Apps & Credentials** -> **Sandbox** -> create/open a Merchant REST App.
 2. Copy the **Client ID** and **Client Secret** into `/payments/.env` (`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`) with `PAYPAL_BASE_URL=https://api-m.sandbox.paypal.com`.
 3. *(Optional Tier 1 Zero-Touch)* Vault a buyer PayPal payment method via PayPal Vault v3 and set `PAYPAL_VAULT_ID`. If the live Vault path fails, the service logs a warning (without emitting `SECURITY_ALERT`) and falls back to `STANDARD_CAPTURE`.
-4. *(Currency Guard)* PayPal REST Orders v2 does not support `INR` in live mode; the service automatically converts `INR` line items, 18% GST tax, and total to `USD` using `INR_TO_USD` (default `0.012`), reconciles to 2 decimal places, and records `originalCurrency` and `originalAmount` in the response.
+4. *(Currency Guard)* PayPal REST Orders v2 does not support `INR` in live mode; the service automatically converts `INR` line items, tax, and total to `USD` using `INR_TO_USD` (default `0.012`), reconciles to 2 decimal places, and records `originalCurrency`, `originalAmount`, and `conversionRate` in the live response.
 
-### Webhook Registration and Verification
+#### Configuring `PAYPAL_WEBHOOK_ID` & Webhook Verification
 1. Expose `/webhooks/paypal` over HTTPS (e.g. Render or `ngrok http 5000`).
-2. In your PayPal Sandbox App settings, add a Webhook pointing to `https://<your-domain>/webhooks/paypal` and subscribe to `CHECKOUT.ORDER.APPROVED` and `PAYMENT.CAPTURE.COMPLETED`.
-3. Set `PAYPAL_WEBHOOK_ID` in `/payments/.env` to the generated Webhook ID.
+2. In your PayPal Sandbox App settings, add a Webhook pointing to `https://<your-domain>/webhooks/paypal` and subscribe to `PAYMENT.CAPTURE.COMPLETED` (and optionally `CHECKOUT.ORDER.APPROVED` / `PAYMENT.CAPTURE.DENIED`).
+3. Set `PAYPAL_WEBHOOK_ID` in `/payments/.env` to the generated Webhook ID and restart the service.
 4. Verification behavior:
-   - **Live (`PAYPAL_WEBHOOK_ID` + credentials set):** Captures raw request bytes and verifies the 5 `PAYPAL-*` signature headers (`PAYPAL-TRANSMISSION-ID`, `PAYPAL-TRANSMISSION-TIME`, `PAYPAL-TRANSMISSION-SIG`, `PAYPAL-CERT-URL`, `PAYPAL-AUTH-ALGO`) via `POST /v1/notifications/verify-webhook-signature`. Returns `401` and logs a `SECURITY_ALERT` event on failure.
+   - **Live (`PAYPAL_WEBHOOK_ID` + credentials set):** Captures raw request bytes and verifies the 5 `PAYPAL-*` signature headers (`PAYPAL-TRANSMISSION-ID`, `PAYPAL-TRANSMISSION-TIME`, `PAYPAL-TRANSMISSION-SIG`, `PAYPAL-CERT-URL`, `PAYPAL-AUTH-ALGO`) via `POST /v1/notifications/verify-webhook-signature`. Returns `401` and logs a `SECURITY_ALERT` event (`WEBHOOK_VERIFICATION_FAILED`) on failure.
    - **Simulation (`PAYPAL_WEBHOOK_ID` unset/placeholder):** Skips cryptographic signature verification (`verification: "SIMULATED_SKIPPED"` — **not** cryptographic verification) and accepts the payload with `200` for local demo convenience.
-   - **Event handling scope:** This hackathon handler records `WEBHOOK_VERIFIED` and `SETTLED` for demo capture webhooks such as `PAYMENT.CAPTURE.COMPLETED`; not every PayPal webhook event type represents a settled payment, so production deployments should filter on verified settlement events (e.g. `PAYMENT.CAPTURE.COMPLETED`) before marking orders settled.
+   - **Event & Deduplication Scope:** All verified webhooks log a `WEBHOOK_VERIFIED` ledger event (with `rawBodySha256`), whereas only `PAYMENT.CAPTURE.COMPLETED` additionally appends a `SETTLED` ledger event and returns a non-null `settledEventId`. Non-settlement events (e.g., `PAYMENT.CAPTURE.DENIED`, `CHECKOUT.ORDER.APPROVED`, or missing/blank `event_type` which defaults to `UNKNOWN`) return `settledEventId: null` without emitting `SETTLED`. App-instance-scoped deduplication tracks processed `webhookEvent.id` values and settled capture keys (or fallback order/intent keys when `captureId` is unavailable) after verification succeeds so duplicate `PAYMENT.CAPTURE.COMPLETED` deliveries return `200` with `"duplicate": true` and `"settledEventId": null` without duplicating `SETTLED`, while malformed JSON or non-object payloads return `400` and failed verifications/settlements do not block retries.
+
+#### Testing a Live Sandbox Payment & Webhook Verification
+*(Note: Execute these only after supplying real sandbox credentials; not yet verified end-to-end against live PayPal servers.)*
+1. **Payment smoke test:** Start the server (`npm run build && npm start`) and post a valid Tier 2 intent (which avoids needing a Vault token) to `POST /orders/create-and-capture`:
+   - Confirm `"mode": "LIVE_PAYPAL_SANDBOX"`, a USD-converted `amount` with `"currency": "USD"`, `"originalCurrency": "INR"`, and HTTP `200` (`GET /ledger/verify` should remain `valid: true`).
+2. **Webhook negative & positive verification tests:**
+   - Send a synthetic `POST /webhooks/paypal` without valid `PAYPAL-*` signature headers and confirm HTTP `401` plus a `SECURITY_ALERT` entry in `GET /ledger/events`.
+   - Trigger a signed webhook from the PayPal Developer **Webhook Simulator** (pointing at your HTTPS tunnel URL) for `PAYMENT.CAPTURE.COMPLETED` and confirm HTTP `200` with `"verification": "SUCCESS"` and a `WEBHOOK_VERIFIED` + `SETTLED` pair in `/ledger/events`.
+
+#### Switching Safely Back to Simulation Mode
+1. Clear or restore placeholder values in `/payments/.env` for `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, and `PAYPAL_WEBHOOK_ID` (and optionally `PAYPAL_VAULT_ID`).
+2. Restart the Payments server (`npm start` or `npm run dev`) so cached tokens/settings reset.
+3. Verify `GET /health` is responsive and a test request returns `"mode": "SIMULATED_SANDBOX"` and `"verification": "SIMULATED_SKIPPED"` for webhooks.
 
 ---
 
@@ -90,7 +113,40 @@ bash scripts/demo-sequence.sh
 
 ---
 
-## 6. API Routes (`http://localhost:5000`)
+## 6. P4 / P3 Gateway Integration Contract
+
+> **Integration Alignment Required:** Before end-to-end integration, P3 must confirm the Gateway's exact outbound payload mapping (including `items`, 2-decimal `subtotal`/`tax`/`total` reconciliation, and optional `mandate` / `mlDsaSignatureHex` / `publicKeyHex` forwarding) as well as any inter-service authentication/authorization expectations between P3 and P4. Currently P4 accepts local HTTP calls without shared-secret or JWT authentication middleware.
+
+- **Base URL & Default Port:** `http://localhost:5000` (overridden by `PORT`)
+- **Primary Settlement Endpoint:** `POST /orders/create-and-capture` (`Content-Type: application/json`)
+  - **Required fields (`CheckoutIntent`):**
+    - `intentId`: non-empty `string` (idempotency key)
+    - `total`: finite `number > 0` (must equal `subtotal + tax` to 2 decimal places)
+    - `currency`: non-empty `string` (e.g. `"INR"` or `"USD"`)
+    - `items`: non-empty array of `{ id: string, name: string, price: number >= 0, quantity: number > 0 }`
+  - **Optional / Recommended fields:**
+    - `subtotal`: non-negative finite `number` (if supplied, must equal `sum(price * quantity)` in cents; defaults to item sum if omitted)
+    - `tax`: non-negative finite `number` (defaults to `0` if omitted)
+    - `mandateId`, `merchant`, `nonce`, `status` (stored in ledger events & dispute context)
+    - `mandate` (`SpendingMandate`), `mlDsaSignatureHex` (or `signatureHex`), `publicKeyHex` (forwarded into `GET /disputes/:intentId/package`; placeholders are used when omitted)
+  - **Responses:**
+    - `200 OK` (`SettlementResult`):
+      - **Simulation mode (`mode: "SIMULATED_SANDBOX"`):** `{ mode, tier, settlementPath, vaultStatus?, orderId, captureId, status, amount, currency, merchant }` — includes `merchant` and sets `vaultStatus: "SIMULATED"` on Tier 1 (`VAULT_ZERO_TOUCH`); omits `vaultStatus` on Tier 2 (`STANDARD_CAPTURE`).
+      - **Live PayPal Sandbox mode (`mode: "LIVE_PAYPAL_SANDBOX"`):** `{ mode, tier, settlementPath, vaultStatus?, orderId, captureId, status, amount, currency, originalCurrency?, originalAmount?, conversionRate?, raw }` — **omits `merchant`**, sets `vaultStatus: "VAULTED_LIVE"` only when Tier 1 live Vault capture succeeds (omitted for `STANDARD_CAPTURE` Tier 1 fallback or Tier 2), includes `originalCurrency`, `originalAmount`, and `conversionRate` when an unsupported currency (e.g., `INR`) was converted to `USD`, and includes `raw` (PayPal's API response payload).
+    - `400 Bad Request`: `{ error: "Invalid CheckoutIntent payload", details: string[] }`
+    - `500 Internal Server Error`: `{ error: string }` (failed attempts are **not** cached, so retries with the same `intentId` execute cleanly)
+- **Idempotency & Concurrency:** Concurrent or repeated `POST /orders/create-and-capture` calls sharing `intentId` share any active in-flight settlement or return the cached `SettlementResult` without calling PayPal twice, appending a `PAYPAL_CAPTURE_COMPLETED` event with `"detail": "IDEMPOTENT_REPLAY"` and `"idempotentReplay": true`.
+- **Tier 1 vs Tier 2 Behavior:**
+  - `intent.total <= TIER1_LIMIT` (default `2500`): Tier `1` -> attempts `VAULT_ZERO_TOUCH` (`vaultStatus: "SIMULATED"` in simulation; live mode uses `PAYPAL_VAULT_ID` and sets `vaultStatus: "VAULTED_LIVE"` on success, or falls back to `STANDARD_CAPTURE` without `vaultStatus` and logs a warning on vault failure).
+  - `intent.total > TIER1_LIMIT`: Tier `2` -> uses `STANDARD_CAPTURE`.
+- **Ledger Events (`GET /ledger/events` & SSE `GET /ledger/stream`):**
+  - `MANDATE_CREATED`, `PAYPAL_ORDER_CREATED`, `PAYPAL_CAPTURE_COMPLETED` (with `detail: "IDEMPOTENT_REPLAY"` on replays), `WEBHOOK_VERIFIED`, `SETTLED` (on verified non-duplicate `PAYMENT.CAPTURE.COMPLETED`), and `SECURITY_ALERT` (`WEBHOOK_VERIFICATION_FAILED`).
+- **Webhook Endpoint (`POST /webhooks/paypal`):**
+  - Uses raw-body inspection (`express.raw({ type: '*/*' })`); returns `400` (`{ error: "Invalid JSON webhook payload" }` or `{ error: "Webhook payload must be a JSON object" }`) for malformed JSON or non-object payloads (such as arrays or primitives), `401` on failed verification when `PAYPAL_WEBHOOK_ID` is set, and `200` (`"verification": "SIMULATED_SKIPPED"` when `PAYPAL_WEBHOOK_ID` is unset/placeholder, or `"SUCCESS"` when verified). Duplicate `webhookEvent.id` deliveries or repeated `PAYMENT.CAPTURE.COMPLETED` captures return `200` with `"duplicate": true` and `"settledEventId": null`.
+
+---
+
+## 7. API Routes (`http://localhost:5000`)
 
 | Method & Path | Purpose |
 | :--- | :--- |
@@ -99,14 +155,14 @@ bash scripts/demo-sequence.sh
 | `GET /ledger/events` | Retrieve all ledger events and chain integrity boolean |
 | `GET /ledger/verify` | Verify SHA-256 hash chain (`{ valid, eventCount, headHash }`) |
 | `POST /orders/create-and-capture` | Validate intent, enforce idempotency, reconcile amounts/GST, settle Tier 1/Tier 2 order |
-| `POST /webhooks/paypal` | Raw-body PayPal webhook listener; verifies signature when `PAYPAL_WEBHOOK_ID` is set (skipped in simulation mode) and logs webhook/settlement events |
+| `POST /webhooks/paypal` | Raw-body PayPal webhook listener (`400` on invalid/non-object JSON, `401` on failed signature); verifies signature when `PAYPAL_WEBHOOK_ID` is set (skipped in simulation mode), deduplicates repeats, and logs webhook/settlement events |
 | `GET /disputes/:intentId/package` | Export `MerkleDisputePackage` for a settled intent (`404` if unsettled) |
 
 *(Note: The root `postman_collection.json` currently includes `/ledger/events` and `/webhooks/paypal`; use the requests below to test all P4 endpoints in Postman or `curl`.)*
 
 ---
 
-## 7. Example Requests & Responses
+## 8. Example Requests & Responses & Cryptographic Limitations
 
 ### Health Check
 ```bash
@@ -165,7 +221,7 @@ curl -sS -X POST http://localhost:5000/webhooks/paypal \
     "resource": { "id": "CAP-001", "status": "COMPLETED" }
   }'
 ```
-Example response (simulation mode):
+Example response (`200` simulation mode; `SIMULATED_SKIPPED`; `duplicate: true` and `settledEventId: null` on replays or non-settlement events; `400` on invalid/non-object JSON; `401` when signature verification fails):
 ```json
 {
   "received": true,
@@ -188,8 +244,9 @@ curl -sS http://localhost:5000/ledger/verify
 }
 ```
 
-### Dispute Package (`GET /disputes/:intentId/package`)
-The exported `MerkleDisputePackage` provides **SHA-256 hash-chain and Merkle evidence** (`ledgerProofChain` and a SHA-256 `merkleRoot` computed over the intent's ledger event hashes). **ML-DSA signing is not implemented yet in this service**: unless `mlDsaSignatureHex` and `publicKeyHex` are forwarded by the caller during settlement, those fields are populated with clearly labelled placeholders (`PLACEHOLDER_UNAVAILABLE_ML_DSA_SIGNATURE_HEX` and `PLACEHOLDER_UNAVAILABLE_PUBLIC_KEY_HEX`).
+### Dispute Package & ML-DSA Limitation (`GET /disputes/:intentId/package`)
+- **What is implemented today:** P4 maintains a tamper-evident append-only **SHA-256 hash chain** (`ImmutableLedger`, verifiable via `GET /ledger/verify`) and generates a **SHA-256 `MerkleDisputePackage`** (`ledgerProofChain` plus `merkleRoot` computed deterministically with odd-count last-leaf duplication) for any settled `intentId`. If the caller supplies `mandate`, `mlDsaSignatureHex` (or `signatureHex`), and `publicKeyHex` on `POST /orders/create-and-capture`, those values are stored and included in the exported package; otherwise `PLACEHOLDER_UNAVAILABLE_*` strings are emitted.
+- **What is missing for real ML-DSA signing and verification:** P4 does **not** currently integrate a post-quantum ML-DSA cryptography library, generate or manage ML-DSA signing keys, cryptographically sign exported dispute packages, or verify incoming mandate/intent ML-DSA signatures against a registered public key. Production readiness requires integrating real ML-DSA signing/verification primitives and agreeing on a canonical payload serialization format across P2, P3, and P4.
 
 ```bash
 curl -sS http://localhost:5000/disputes/intent_001/package

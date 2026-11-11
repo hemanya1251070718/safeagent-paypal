@@ -120,6 +120,25 @@ function extractHeaderMap(req: Request): Record<string, string | undefined> {
   return headers;
 }
 
+function getSettlementDedupKey(captureId?: string, orderId?: string, intentId?: string): string | null {
+  const cleanCapture = typeof captureId === 'string' ? captureId.trim() : '';
+  if (cleanCapture.length > 0) {
+    return `capture:${cleanCapture}`;
+  }
+  const cleanOrder = typeof orderId === 'string' ? orderId.trim() : '';
+  const cleanIntent = typeof intentId === 'string' ? intentId.trim() : '';
+  if (cleanOrder.length > 0 && cleanIntent.length > 0) {
+    return `order:${cleanOrder}:intent:${cleanIntent}`;
+  }
+  if (cleanOrder.length > 0) {
+    return `order:${cleanOrder}`;
+  }
+  if (cleanIntent.length > 0) {
+    return `intent:${cleanIntent}`;
+  }
+  return null;
+}
+
 export function createPaymentsApp(deps: PaymentsAppDeps = {}) {
   const app = express();
   const ledger = deps.ledger ?? defaultLedger;
@@ -131,12 +150,14 @@ export function createPaymentsApp(deps: PaymentsAppDeps = {}) {
   // List of connected SSE clients (e.g. P1 AG Grid dashboard)
   let sseClients: Response[] = [];
 
-  // Idempotency cache, dispute context store, and order->intent correlation map
+  // Idempotency cache, dispute context store, webhook deduplication, and order->intent correlation map
   const settledOrders = new Map<string, SettlementResult>();
   const settledContexts = new Map<string, SettledIntentContext>();
   const inFlightOrders = new Map<string, Promise<SettlementResult>>();
   const orderToIntentMap = new Map<string, { intentId: string; mandateId?: string }>();
   const mandatesById = new Map<string, SpendingMandate>();
+  const processedWebhookEvents = new Map<string, string>();
+  const settledWebhookKeys = new Set<string>();
 
   function broadcastSSE(event: any) {
     const data = `data: ${JSON.stringify(event)}\n\n`;
@@ -194,7 +215,10 @@ export function createPaymentsApp(deps: PaymentsAppDeps = {}) {
       return res.status(400).json({ error: 'Webhook payload must be a JSON object' });
     }
 
-    const eventType: string = webhookEvent.event_type || 'PAYMENT.CAPTURE.COMPLETED';
+    const eventType: string =
+      typeof webhookEvent.event_type === 'string' && webhookEvent.event_type.trim().length > 0
+        ? webhookEvent.event_type.trim()
+        : 'UNKNOWN';
     const orderId: string | undefined =
       webhookEvent.resource?.supplementary_data?.related_ids?.order_id ||
       webhookEvent.orderId ||
@@ -215,57 +239,100 @@ export function createPaymentsApp(deps: PaymentsAppDeps = {}) {
       webhookEvent.resource?.invoice_id;
     const mandateId: string | undefined = mapped?.mandateId || webhookEvent.mandateId;
 
-    const verification = await paypalService.verifyWebhookSignature({
-      headers: extractHeaderMap(req),
-      webhookEvent
-    });
+    const webhookId =
+      typeof webhookEvent.id === 'string' && webhookEvent.id.trim().length > 0
+        ? webhookEvent.id.trim()
+        : undefined;
 
-    if (!verification.verified) {
-      const alertEvt = ledger.append('SECURITY_ALERT', {
-        alertType: 'WEBHOOK_VERIFICATION_FAILED',
-        verification: verification.status,
-        reason: verification.reason || 'Webhook signature verification failed',
-        eventType,
-        transmissionId: req.header('paypal-transmission-id') || null
-      }, mandateId, intentId);
-      broadcastSSE(alertEvt);
-
-      return res.status(401).json({
-        received: false,
-        verified: false,
-        error: 'Webhook signature verification failed',
-        reason: verification.reason
+    try {
+      const verification = await paypalService.verifyWebhookSignature({
+        headers: extractHeaderMap(req),
+        webhookEvent
       });
+
+      if (!verification.verified) {
+        const alertEvt = ledger.append('SECURITY_ALERT', {
+          alertType: 'WEBHOOK_VERIFICATION_FAILED',
+          verification: verification.status,
+          reason: verification.reason || 'Webhook signature verification failed',
+          eventType,
+          transmissionId: req.header('paypal-transmission-id') || null
+        }, mandateId, intentId);
+        broadcastSSE(alertEvt);
+
+        return res.status(401).json({
+          received: false,
+          verified: false,
+          error: 'Webhook signature verification failed',
+          reason: verification.reason
+        });
+      }
+
+      const existingWebhookEventId = webhookId ? processedWebhookEvents.get(webhookId) : undefined;
+      if (existingWebhookEventId) {
+        return res.status(200).json({
+          received: true,
+          verified: true,
+          duplicate: true,
+          verification: verification.status,
+          webhookEventId: existingWebhookEventId,
+          settledEventId: null
+        });
+      }
+
+      const verifiedEvt = ledger.append('WEBHOOK_VERIFIED', {
+        eventType,
+        webhookEventId: webhookId || null,
+        orderId: orderId || null,
+        captureId: captureId || null,
+        verification: verification.status,
+        rawBodySha256: createHash('sha256').update(rawBuffer).digest('hex'),
+        resource: webhookEvent.resource
+      }, mandateId, intentId);
+      broadcastSSE(verifiedEvt);
+
+      const isSettlementEvent = eventType === 'PAYMENT.CAPTURE.COMPLETED';
+      const settlementKey = isSettlementEvent
+        ? getSettlementDedupKey(captureId, orderId, intentId)
+        : null;
+      const isDuplicateSettlement = Boolean(
+        isSettlementEvent && settlementKey && settledWebhookKeys.has(settlementKey)
+      );
+
+      const settledEvt =
+        isSettlementEvent && settlementKey !== null && !isDuplicateSettlement
+          ? ledger.append('SETTLED', {
+              eventType,
+              orderId: orderId || null,
+              captureId: captureId || null,
+              intentId: intentId || null,
+              verification: verification.status,
+              settledAt: new Date().toISOString()
+            }, mandateId, intentId)
+          : null;
+
+      if (settledEvt) {
+        if (settlementKey) {
+          settledWebhookKeys.add(settlementKey);
+        }
+        broadcastSSE(settledEvt);
+      }
+
+      if (webhookId) {
+        processedWebhookEvents.set(webhookId, verifiedEvt.eventId);
+      }
+
+      return res.status(200).json({
+        received: true,
+        verified: true,
+        ...(isDuplicateSettlement ? { duplicate: true } : {}),
+        verification: verification.status,
+        webhookEventId: verifiedEvt.eventId,
+        settledEventId: settledEvt ? settledEvt.eventId : null
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: err?.message || 'Webhook processing failed' });
     }
-
-    const verifiedEvt = ledger.append('WEBHOOK_VERIFIED', {
-      eventType,
-      webhookEventId: webhookEvent.id || null,
-      orderId: orderId || null,
-      captureId: captureId || null,
-      verification: verification.status,
-      rawBodySha256: createHash('sha256').update(rawBuffer).digest('hex'),
-      resource: webhookEvent.resource
-    }, mandateId, intentId);
-    broadcastSSE(verifiedEvt);
-
-    const settledEvt = ledger.append('SETTLED', {
-      eventType,
-      orderId: orderId || null,
-      captureId: captureId || null,
-      intentId: intentId || null,
-      verification: verification.status,
-      settledAt: new Date().toISOString()
-    }, mandateId, intentId);
-    broadcastSSE(settledEvt);
-
-    return res.status(200).json({
-      received: true,
-      verified: true,
-      verification: verification.status,
-      webhookEventId: verifiedEvt.eventId,
-      settledEventId: settledEvt.eventId
-    });
   });
 
   app.use(express.json());

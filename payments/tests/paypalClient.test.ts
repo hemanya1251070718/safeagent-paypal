@@ -236,4 +236,105 @@ describe('PayPalService & amount reconciliation', () => {
     expect(second.amount).toBe(3540);
     expect(firstOrderSuffix).not.toBe(secondOrderSuffix);
   });
+
+  it('sends PayPal-Request-Id headers on live Tier 2 capture and converts INR to USD', async () => {
+    process.env.PAYPAL_CLIENT_ID = 'test_client_id';
+    process.env.PAYPAL_CLIENT_SECRET = 'test_client_secret';
+    process.env.INR_TO_USD = '0.012';
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const axiosPost = vi.spyOn(axios, 'post').mockImplementation(async (url: string, payload: any, config: any) => {
+      if (url.endsWith('/v1/oauth2/token')) {
+        return { data: { access_token: 'mock_tok', expires_in: 3600 } } as any;
+      }
+      if (url.endsWith('/v2/checkout/orders')) {
+        expect(config?.headers?.['PayPal-Request-Id']).toBe('req_intent_live_t2');
+        expect(payload.purchase_units[0].amount.currency_code).toBe('USD');
+        return { data: { id: 'ORD-LIVE-T2', status: 'CREATED' } } as any;
+      }
+      if (url.endsWith('/v2/checkout/orders/ORD-LIVE-T2/capture')) {
+        expect(config?.headers?.['PayPal-Request-Id']).toBe('cap_intent_live_t2');
+        return {
+          data: {
+            id: 'ORD-LIVE-T2',
+            status: 'COMPLETED',
+            purchase_units: [{ payments: { captures: [{ id: 'CAP-LIVE-T2' }] } }]
+          }
+        } as any;
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+
+    const service = new PayPalService();
+    const result = await service.createAndCaptureOrder(
+      makeIntent({
+        intentId: 'intent_live_t2',
+        items: [{ id: 'p2', name: 'Keyboard', price: 3000, quantity: 1 }],
+        subtotal: 3000,
+        tax: 540,
+        total: 3540,
+        currency: 'INR'
+      })
+    );
+
+    expect(result.mode).toBe('LIVE_PAYPAL_SANDBOX');
+    expect(result.tier).toBe(2);
+    expect(result.settlementPath).toBe('STANDARD_CAPTURE');
+    expect(result.currency).toBe('USD');
+    expect(result.originalCurrency).toBe('INR');
+    expect(result.originalAmount).toBe(3540);
+    expect(result.orderId).toBe('ORD-LIVE-T2');
+    expect(result.captureId).toBe('CAP-LIVE-T2');
+    expect(axiosPost).toHaveBeenCalledTimes(3);
+  });
+
+  it('surfaces PayPal error name, message, details, and debug_id without leaking credentials', async () => {
+    process.env.PAYPAL_CLIENT_ID = 'test_client_id';
+    process.env.PAYPAL_CLIENT_SECRET = 'super_secret_should_not_leak';
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    vi.spyOn(axios, 'post').mockImplementation(async (url: string) => {
+      if (url.endsWith('/v1/oauth2/token')) {
+        return { data: { access_token: 'mock_tok_secret', expires_in: 3600 } } as any;
+      }
+      if (url.endsWith('/v2/checkout/orders')) {
+        const err: any = new Error('Request failed with status code 422');
+        err.isAxiosError = true;
+        err.response = {
+          status: 422,
+          data: {
+            name: 'UNPROCESSABLE_ENTITY',
+            message: 'The requested action could not be performed',
+            debug_id: 'dbg_422_trace',
+            details: [{ issue: 'DECISION_PROFILE_REVIEW', description: 'Amount mismatch' }]
+          }
+        };
+        throw err;
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+
+    const service = new PayPalService();
+    let caughtMessage = '';
+    try {
+      await service.createAndCaptureOrder(
+        makeIntent({
+          intentId: 'intent_live_err',
+          items: [{ id: 'p2', name: 'Keyboard', price: 3000, quantity: 1 }],
+          subtotal: 3000,
+          tax: 540,
+          total: 3540
+        })
+      );
+    } catch (err: any) {
+      caughtMessage = err.message;
+    }
+
+    expect(caughtMessage).toContain('UNPROCESSABLE_ENTITY');
+    expect(caughtMessage).toContain('The requested action could not be performed');
+    expect(caughtMessage).toContain('dbg_422_trace');
+    expect(caughtMessage).toContain('DECISION_PROFILE_REVIEW');
+    expect(caughtMessage).not.toContain('super_secret_should_not_leak');
+    expect(caughtMessage).not.toContain('mock_tok_secret');
+  });
 });
