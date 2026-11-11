@@ -20,6 +20,7 @@ export interface PlanExecutionResult {
   trace: ReasoningStep[];
   intent?: any;
   gatewayDecision?: any;
+  availableOptions?: any[];
 }
 
 export class CognitivePlanner {
@@ -299,7 +300,8 @@ export class CognitivePlanner {
       finalStatus: submission.status,
       trace,
       intent: submission.intent,
-      gatewayDecision: submission
+      gatewayDecision: submission,
+      availableOptions: searchResult.products.slice(0, 5)
     };
   }
 }
