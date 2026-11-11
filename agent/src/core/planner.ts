@@ -256,8 +256,27 @@ export class CognitivePlanner {
         budgetSearch = await executeSearchProducts({ query: productCategory, category: productCategory, maxPrice: maxPreTaxPrice });
       }
 
-      // Filter out the over-budget product itself
-      const validAlternatives = budgetSearch.products.filter(p => p.id !== chosenProduct.id && p.price <= maxPreTaxPrice);
+      // Filter out the over-budget product itself and enforce strict product type matching
+      // Alternative product MUST belong to the exact same product type as original (e.g. laptop -> laptop only, never accessories/chargers)
+      const productTypeTokens = ['laptop', 'notebook', 'phone', 'smartphone', 'monitor', 'keyboard', 'mouse', 'shoes', 'shirt', 'charger', 'headphones'];
+      const targetType = productTypeTokens.find(token => 
+        goal.toLowerCase().includes(token) || 
+        productTags.some(t => t.toLowerCase() === token) ||
+        chosenProduct.name.toLowerCase().includes(token)
+      );
+
+      const validAlternatives = budgetSearch.products.filter(p => {
+        if (p.id === chosenProduct.id || p.price > maxPreTaxPrice) return false;
+
+        if (targetType) {
+          const altHasType = (p.tags || []).some((t: string) => t.toLowerCase() === targetType) || p.name.toLowerCase().includes(targetType);
+          if (!altHasType) return false;
+        } else if (p.category !== chosenProduct.category) {
+          return false;
+        }
+
+        return true;
+      });
 
       log('TOOL_RESULT', `Budget recovery search discovered ${validAlternatives.length} compliant options within policy limits.`, { count: validAlternatives.length, alternatives: validAlternatives });
 

@@ -114,6 +114,17 @@ export const CATALOG: MerchantProduct[] = [
     tags: ["laptop", "macbook", "apple", "m3", "notebook", "computer"]
   },
   {
+    id: "ACER-ASP3",
+    merchant: "Amazon-India",
+    name: "Acer Aspire 3 15.6-inch Intel Celeron N4500 Thin Laptop",
+    category: "hardware",
+    price: 23990,
+    currency: "INR",
+    inStock: true,
+    description: "Intel Celeron N4500 Dual-Core Processor, 8GB DDR4 RAM, 256GB NVMe SSD, Windows 11 Home, Pure Silver, 1.7 Kg.",
+    tags: ["laptop", "acer", "aspire", "computer", "notebook", "budget", "windows"]
+  },
+  {
     id: "LENO-IP3",
     merchant: "Amazon-India",
     name: "Lenovo IdeaPad Slim 3 15.6-inch FHD Thin & Light Laptop",

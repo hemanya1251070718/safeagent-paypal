@@ -46,17 +46,34 @@ export class StoreService {
         return { product, score: 1 };
       }
 
-      // Score relevance: Title matches = 10 pts, Tag matches = 5 pts, Description matches = 2 pts
+      // Score relevance: Title matches = 10 pts, Tag matches = 5 pts, Description matches = 1 bonus pt
+      // STRICT GROUNDING: Must match on Name or Tags. Description-only occurrence (e.g. "charges laptops") is NOT a product match.
       let score = 0;
+      let hasCoreMatch = false;
       const lowerName = product.name.toLowerCase();
       const lowerDesc = product.description.toLowerCase();
       const lowerTags = product.tags.map(t => t.toLowerCase());
 
       for (const kw of activeKeywords) {
         const wordRegex = new RegExp(`\\b${kw}`, 'i');
-        if (wordRegex.test(lowerName)) score += 10;
-        if (lowerTags.some(t => t === kw || t.startsWith(kw))) score += 5;
-        if (wordRegex.test(lowerDesc)) score += 2;
+        const nameMatch = wordRegex.test(lowerName);
+        const tagMatch = lowerTags.some(t => t === kw || t.startsWith(kw));
+
+        if (nameMatch) {
+          score += 10;
+          hasCoreMatch = true;
+        }
+        if (tagMatch) {
+          score += 5;
+          hasCoreMatch = true;
+        }
+        if (hasCoreMatch && wordRegex.test(lowerDesc)) {
+          score += 1;
+        }
+      }
+
+      if (!hasCoreMatch) {
+        return { product, score: 0 };
       }
 
       return { product, score };
