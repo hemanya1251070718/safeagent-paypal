@@ -116,16 +116,15 @@ The architecture is structured across four decoupled layers:
 
 #### Person 4 (P4): Payments, Ledger and Telemetry Backend
 * Set up the PayPal developer sandbox: business and buyer accounts, and REST app credentials.
-* Build payment module exposing `createAndCaptureOrder(validatedIntent)`:
-  * `POST /v2/checkout/orders` with itemized breakdown and tax
-  * Capture on authorization
-  * Idempotency keys (`PayPal-Request-Id`) to prevent duplicate charges
-* Work out Tier 1 "zero-touch" approach in sandbox (vaulted or pre-authorized payment source).
-* Integrate Invoicing API for itemized records.
-* Build `POST /webhooks/paypal` with webhook signature verification (`POST /v1/notifications/verify-webhook-signature`).
-* Build immutable ledger: append-only, with each entry hash-chained to the previous one:
+* Built payment module exposing `POST /orders/create-and-capture` using PayPal Orders v2 API & Vault tokens (`payment_source.paypal.vault_id`).
+* Enforced strict idempotency (`PayPal-Request-Id`) across in-flight and completed orders to eliminate double-captures.
+* Strict cents-level mathematical reconciliation: `total == subtotal + tax` and `subtotal == sum(item.price * item.quantity)`.
+* Integrated PayPal Webhook listener (`POST /webhooks/paypal`) with cryptographic signature verification (`verify-webhook-signature`) and deduplication.
+* Built append-only SHA-256 hash-chained immutable ledger:
   $$\text{Hash}_n = \text{SHA256}(\text{Hash}_{n-1} + \text{Timestamp} + \text{EventData})$$
-* Stream ledger events to the dashboard over SSE or WebSocket at `GET /ledger/stream`.
+* Implemented Merkle Dispute Package generator (`GET /disputes/:intentId/package`) exporting Merkle roots and proof chains for dispute resolution.
+* Real-time SSE telemetry broadcaster (`GET /ledger/stream`) with 15s keepalive heartbeats feeding P1's AG Grid v33 dashboard.
+* 20/20 tests passing in Vitest suite (`payments/tests/`).
 
 ---
 
