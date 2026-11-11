@@ -109,7 +109,20 @@ export class StoreService {
       defaultBudget: 2999
     };
 
-    if (q.includes("phone") || q.includes("mobile") || q.includes("smartphone")) {
+    if (q.includes("iphone") || (q.includes("apple") && (q.includes("phone") || q.includes("pro")))) {
+      // Apple does not manufacture budget iPhones under ₹45,000; refuse to synthesize unrealistic budget listings
+      if (options.maxPrice && options.maxPrice < 45000) {
+        return [];
+      }
+      const isProMax = q.includes("pro max") || q.includes("promax") || q.includes("17") || q.includes("16");
+      const isPro = q.includes("pro");
+      const flagshipPrice = isProMax ? 149900 : isPro ? 129900 : 79900;
+      brandTier = {
+        brands: ["Apple"],
+        category: 'electronics',
+        defaultBudget: flagshipPrice
+      };
+    } else if (q.includes("phone") || q.includes("mobile") || q.includes("smartphone")) {
       brandTier = {
         brands: ["OnePlus", "Samsung", "Nothing", "Redmi", "Realme"],
         category: 'electronics',
@@ -153,6 +166,7 @@ export class StoreService {
       };
     }
 
+    const isFlagship = brandTier.defaultBudget >= 50000;
     const maxBudget = options.maxPrice && options.maxPrice > 0 ? options.maxPrice : brandTier.defaultBudget;
     const synthList: MerchantProduct[] = [];
 
@@ -161,21 +175,25 @@ export class StoreService {
       const merchant = merchants[i % merchants.length];
       
       // Calculate realistic distributed price points under the max budget
-      const priceFactor = 0.65 + (i * 0.08); // 65%, 73%, 81%, 89%, 97% of budget
-      const calculatedPrice = Math.max(299, Math.round((maxBudget * priceFactor) / 10) * 10 - 1); // e.g. ₹24,999, ₹21,999
+      const priceFactor = isFlagship && !options.maxPrice ? (1.0 - (i * 0.03)) : isFlagship ? (0.95 + (i * 0.01)) : (0.65 + (i * 0.08));
+      const calculatedPrice = Math.max(299, Math.round((maxBudget * priceFactor) / 10) * 10 - 1); // e.g. ₹1,49,899, ₹24,999
 
       const hashStr = Math.abs((query + brand + merchant).split('').reduce((acc, char) => (acc << 5) - acc + char.charCodeAt(0), 0)).toString(36).toUpperCase().substring(0, 8);
       const prodId = `DYN-${hashStr}`;
 
+      const displayName = baseNoun.toLowerCase().startsWith(brand.toLowerCase())
+        ? baseNoun
+        : `${brand} ${baseNoun}`;
+
       synthList.push({
         id: prodId,
         merchant,
-        name: `${brand} ${baseNoun} Edition`,
+        name: displayName,
         category: brandTier.category,
         price: calculatedPrice,
         currency: "INR",
         inStock: true,
-        description: `${brand} ${baseNoun} with official brand warranty, available via verified merchant partner ${merchant}.`,
+        description: `${displayName} with official brand warranty, available via verified merchant partner ${merchant}.`,
         tags: [query.toLowerCase(), brand.toLowerCase(), baseNoun.toLowerCase()]
       });
     }

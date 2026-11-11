@@ -43,6 +43,7 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
     hostilePayload?: string;
     reason?: string;
     merchant?: string;
+    isAttack?: boolean;
   } | null>(null);
 
   const traceContainerRef = useRef<HTMLDivElement>(null);
@@ -107,14 +108,23 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
       setFinalStatus(response.finalStatus || 'COMPLETE');
 
       // Check if Scenario 3 / hostile injection was triggered
-      const isHostile =
+      const isSanitizationAlert = (response.gatewayDecision?.sanitizationAlerts?.length || 0) > 0;
+      const isExplicitInjection =
         scenarioId === 'injection' ||
-        response.finalStatus === 'REJECTED_BY_GATEWAY' ||
         response.gatewayDecision?.policyDecision === 'BLOCKED' ||
-        response.gatewayDecision?.sanitizationAlerts?.length > 0;
+        (response.gatewayDecision?.reasons || []).some((r: string) =>
+          r.toLowerCase().includes('injection') ||
+          r.toLowerCase().includes('override') ||
+          r.toLowerCase().includes('rogue')
+        );
+      const isAttack = isSanitizationAlert || isExplicitInjection;
+      const isPolicyBlocked =
+        isAttack ||
+        response.finalStatus === 'REJECTED_BY_GATEWAY' ||
+        response.gatewayDecision?.policyDecision === 'REJECTED';
 
-      if (isHostile) {
-        // Find hostile item payload from response intent, gatewayDecision, or trace
+      if (isPolicyBlocked) {
+        // Find item payload from response intent, gatewayDecision, or trace
         const tracePayloadItem = response.trace
           ?.map((t: any) => t.payload?.item || t.payload?.items?.[0])
           ?.find((i: any) => i && (i.description || i.name));
@@ -126,10 +136,11 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
             i.name?.includes('ROGUE') ||
             i.description?.includes('OVERRIDE')
           ) ||
+          response.intent?.items?.[0] ||
           response.gatewayDecision?.intent?.items?.[0] ||
           tracePayloadItem;
 
-        const payloadText = hostileItem?.description || hostileItem?.name || null;
+        const payloadText = hostileItem ? `${hostileItem.name || hostileItem.id}${hostileItem.quantity ? ` (Qty: ${hostileItem.quantity})` : ''}` : null;
         const reasonText =
           response.gatewayDecision?.reasons?.join('; ') ||
           response.gatewayDecision?.reason ||
@@ -141,8 +152,9 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
 
         setBlockedNotice({
           hostilePayload: payloadText || 'Blocked by gateway (payload details unavailable)',
-          reason: reasonText || 'Blocked by gateway (payload details unavailable)',
-          merchant: merchantText || '—'
+          reason: reasonText || 'Policy spend limit or constraint violated.',
+          merchant: merchantText || '—',
+          isAttack
         });
       }
 
@@ -272,21 +284,23 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
         </div>
       )}
 
-      {/* Hostile Injection Callout Card (Scenario 3 Highlight) */}
+      {/* Policy / Injection Blocked Callout Card */}
       {blockedNotice && (
         <div className="mb-3 p-3.5 rounded-xl bg-red-950/80 border border-red-500/70 text-red-200 text-xs space-y-2 animate-in fade-in shadow-lg shadow-red-950/50">
           <div className="flex items-center justify-between">
             <span className="font-bold flex items-center gap-1.5 text-red-400 text-xs">
               <ShieldAlert className="h-4 w-4 text-red-400" />
-              <span>Adversarial Prompt Injection Blocked</span>
+              <span>{blockedNotice.isAttack ? "Adversarial Prompt Injection Blocked" : "Mandate Spend Ceiling Exceeded"}</span>
             </span>
             <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/40">
-              Gateway Firewall Slashed
+              {blockedNotice.isAttack ? "Gateway Firewall Slashed" : "Deterministic Gateway Hard Stop"}
             </span>
           </div>
 
           <div className="bg-black/70 p-2.5 rounded-lg font-mono text-[11px] text-red-300 border border-red-900/60 leading-relaxed">
-            <span className="text-red-400 font-bold block mb-0.5">Intercepted Rogue Listing:</span>
+            <span className="text-red-400 font-bold block mb-0.5">
+              {blockedNotice.isAttack ? "Intercepted Rogue Listing:" : "Blocked Intent Cart:"}
+            </span>
             <code className="text-red-200">{blockedNotice.hostilePayload}</code>
           </div>
 

@@ -169,9 +169,29 @@ export class CognitivePlanner {
       // Pre-tax ceiling taking into account 18% GST (price * 1.18 <= allowedSpend)
       const maxPreTaxPrice = Math.floor((allowedSpend / 1.18) * 100) / 100;
 
-      // Extract target product domain/category dynamically from the rejected product's tags and category
+      // Check if user specifically requested a branded flagship (e.g. iPhone / Apple) or a flagship device with no sub-budget counterpart
       const productTags: string[] = (chosenProduct as any).tags || (details.product as any)?.tags || [];
       const productCategory: string = (chosenProduct as any).category || (details.product as any)?.category || "accessories";
+
+      const isBrandSpecificFlagship = 
+        goal.toLowerCase().includes('iphone') || 
+        goal.toLowerCase().includes('apple') ||
+        (chosenProduct as any).name?.toLowerCase().includes('iphone') ||
+        productTags.includes('iphone') ||
+        (chosenProduct.price > 45000 && productCategory === 'electronics' && !goal.toLowerCase().includes('monitor'));
+
+      if (isBrandSpecificFlagship) {
+        log('THOUGHT', `Policy Gateway Hard Stop: Flagship device "${chosenProduct.name}" exceeds mandate spend limit (₹${allowedSpend.toLocaleString('en-IN')}). Policy disallows autonomous substitution of flagship hardware. Deterministic Gateway rejection preserved.`);
+        return {
+          goal,
+          mandateId,
+          success: false,
+          finalStatus: submission.status,
+          trace,
+          intent: submission.intent,
+          gatewayDecision: submission
+        };
+      }
 
       let searchKeyword = "";
       const primaryTag = productTags.find((t: string) => 
@@ -188,8 +208,8 @@ export class CognitivePlanner {
       log('THOUGHT', `Autonomous recovery target: Searching for '${searchKeyword}' alternatives priced under pre-tax ceiling ₹${maxPreTaxPrice.toLocaleString('en-IN')} (to ensure total with 18% GST stays under ₹${allowedSpend.toLocaleString('en-IN')}).`);
 
       let budgetSearch = await executeSearchProducts({ query: searchKeyword, maxPrice: maxPreTaxPrice });
-      // If direct keyword search returned nothing, fall back to product category
-      if (budgetSearch.count === 0 && productCategory) {
+      // If direct keyword search returned nothing, fall back to product category only if broad electronics is avoided
+      if (budgetSearch.count === 0 && productCategory && productCategory !== 'electronics') {
         budgetSearch = await executeSearchProducts({ query: productCategory, category: productCategory, maxPrice: maxPreTaxPrice });
       }
 
@@ -226,7 +246,7 @@ export class CognitivePlanner {
           log('GATEWAY_RESPONSE', `Revised intent evaluation: ${submission.status}`, submission);
         }
       } else {
-        log('THOUGHT', `Autonomous recovery unable to locate alternative items under budget ceiling ₹${maxPreTaxPrice.toLocaleString('en-IN')}.`);
+        log('THOUGHT', `Autonomous recovery unable to locate alternative '${searchKeyword}' items under budget ceiling ₹${maxPreTaxPrice.toLocaleString('en-IN')}. Mandate spend ceiling policy rejection stands.`);
       }
     }
 
