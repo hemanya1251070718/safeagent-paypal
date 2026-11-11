@@ -1,18 +1,25 @@
 import React, { useState } from 'react';
+import type { SpendingMandate } from '../../shared/dist/index.js';
 import { Navbar } from './components/Navbar';
 import { MandateManager } from './components/MandateManager';
 import { AgentGoalChat } from './components/AgentGoalChat';
 import { LedgerTelemetryGrid } from './components/LedgerTelemetryGrid';
 import { BiometricModal } from './components/BiometricModal';
+import { CatalogDrawer } from './components/CatalogDrawer';
+import { ToastContainer } from './components/Toast';
 import { ShieldCheck, Cpu, Zap, Lock } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [activeMandateId, setActiveMandateId] = useState<string>("mandate_active_001");
+  const [activeMandate, setActiveMandate] = useState<SpendingMandate | null>(null);
   const [pendingIntent, setPendingIntent] = useState<any | null>(null);
+  const [blockedEvents, setBlockedEvents] = useState<any[]>([]);
+  const [isCatalogOpen, setIsCatalogOpen] = useState<boolean>(false);
+  const [selectedGoal, setSelectedGoal] = useState<string>('');
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      <Navbar />
+      <Navbar onOpenCatalog={() => setIsCatalogOpen(true)} />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* Top Architecture Banner */}
@@ -38,20 +45,40 @@ export const App: React.FC = () => {
         {/* Main Grid: Mandate Manager & Agent Goal Chat */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-5">
-            <MandateManager onMandateUpdated={(id) => setActiveMandateId(id)} />
+            <MandateManager
+              activeMandateId={activeMandateId}
+              onMandateUpdated={(id, mandate) => {
+                setActiveMandateId(id);
+                if (mandate) {
+                  setActiveMandate(mandate);
+                }
+              }}
+            />
           </div>
 
           <div className="lg:col-span-7">
             <AgentGoalChat
               mandateId={activeMandateId}
+              externalGoal={selectedGoal}
               onBiometricRequired={(intent) => setPendingIntent(intent)}
+              onIntentBlocked={(blocked) => setBlockedEvents((prev) => [blocked, ...prev])}
             />
           </div>
         </div>
 
         {/* Real-time Financial Telemetry AG Grid */}
-        <LedgerTelemetryGrid />
+        <LedgerTelemetryGrid blockedEvents={blockedEvents} />
       </main>
+
+      {/* Whitelisted Merchant Catalog Drawer */}
+      <CatalogDrawer
+        isOpen={isCatalogOpen}
+        onClose={() => setIsCatalogOpen(false)}
+        onSelectProduct={(prompt) => {
+          setSelectedGoal(prompt);
+          setIsCatalogOpen(false);
+        }}
+      />
 
       {/* Tier 2 Biometric Confirmation Modal */}
       {pendingIntent && (
@@ -59,8 +86,12 @@ export const App: React.FC = () => {
           intent={pendingIntent}
           onClose={() => setPendingIntent(null)}
           onConfirmed={() => setPendingIntent(null)}
+          onRejected={() => setPendingIntent(null)}
         />
       )}
+
+      {/* Global Network Error & Notification Toast Container */}
+      <ToastContainer />
 
       {/* Footer */}
       <footer className="border-t border-slate-800/80 py-4 text-center text-xs text-slate-500">

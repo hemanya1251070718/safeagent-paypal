@@ -1,7 +1,11 @@
 import React from 'react';
-import { ShieldCheck, Cpu, CreditCard, Activity } from 'lucide-react';
+import { ShieldCheck, Cpu, CreditCard, ShoppingBag } from 'lucide-react';
 
-export const Navbar: React.FC = () => {
+interface NavbarProps {
+  onOpenCatalog?: () => void;
+}
+
+export const Navbar: React.FC<NavbarProps> = ({ onOpenCatalog }) => {
   return (
     <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -19,6 +23,16 @@ export const Navbar: React.FC = () => {
         </div>
 
         <div className="flex items-center space-x-3">
+          <button
+            onClick={onOpenCatalog}
+            className="flex items-center space-x-1.5 text-xs bg-slate-800 hover:bg-slate-700/80 text-cyan-300 hover:text-cyan-200 px-3 py-1.5 rounded-lg border border-slate-700 hover:border-cyan-500/40 transition cursor-pointer font-medium"
+            title="Inspect Whitelisted Merchant Catalogs (:4001/agent/catalog)"
+          >
+            <ShoppingBag className="h-4 w-4 text-cyan-400" />
+            <span className="hidden sm:inline">Merchant Catalog</span>
+            <span className="sm:hidden">Catalog</span>
+          </button>
+
           <div className="hidden md:flex items-center space-x-2 text-xs bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700/60 text-slate-300">
             <Cpu className="h-4 w-4 text-emerald-400" />
             <span>Agent (P2): <strong className="text-emerald-400">Ready</strong></span>
