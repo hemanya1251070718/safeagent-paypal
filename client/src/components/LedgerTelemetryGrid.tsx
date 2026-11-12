@@ -109,28 +109,39 @@ export const LedgerTelemetryGrid: React.FC<LedgerTelemetryGridProps> = ({ blocke
 
     // Tier extraction
     let tierDisplay: string | number = '—';
-    if (data.tier !== undefined && data.tier !== null) {
+    if (typeof data.tierLabel === 'string' && data.tierLabel.trim().length > 0) {
+      tierDisplay = data.tierLabel;
+    } else if (data.tier !== undefined && data.tier !== null) {
       tierDisplay = `Tier ${data.tier}`;
     } else if (raw.type === 'MANDATE_CREATED') {
       tierDisplay = 'Mandate';
     }
 
-    // Post-Quantum Cryptography status
-    let pqcStatus = '—';
-    if (raw.type === 'MANDATE_CREATED') {
-      pqcStatus = 'ML-DSA-65 Verified';
-    } else if (
-      raw.type === 'PAYPAL_ORDER_CREATED' ||
-      raw.type === 'PAYPAL_CAPTURE_COMPLETED'
-    ) {
-      pqcStatus = 'ML-DSA-65 Verified';
-    } else if (raw.type === 'WEBHOOK_VERIFIED') {
-      pqcStatus = 'PayPal RSA-SHA256';
-    } else if (raw.type === 'SECURITY_ALERT') {
-      pqcStatus = 'Alert Triggered';
-    } else if (raw.type === 'SETTLED') {
-      pqcStatus = 'Merkle Anchored';
+    // Post-Quantum Cryptography / Policy status
+    let pqcStatus = typeof data.pqcStatus === 'string' && data.pqcStatus ? data.pqcStatus : '—';
+    if (pqcStatus === '—') {
+      if (raw.type === 'MANDATE_CREATED') {
+        pqcStatus = 'ML-DSA-65 Verified';
+      } else if (
+        raw.type === 'PAYPAL_ORDER_CREATED' ||
+        raw.type === 'PAYPAL_CAPTURE_COMPLETED'
+      ) {
+        pqcStatus = 'ML-DSA-65 Verified';
+      } else if (raw.type === 'WEBHOOK_VERIFIED') {
+        pqcStatus = 'PayPal RSA-SHA256';
+      } else if (raw.type === 'SECURITY_ALERT') {
+        pqcStatus = 'Alert Triggered';
+      } else if (raw.type === 'POLICY_VALIDATION_FAILED') {
+        pqcStatus = data.displayType === 'ATTACK BLOCKED' ? 'Lattice Firebreak' : 'Policy Guarded';
+      } else if (raw.type === 'SETTLED') {
+        pqcStatus = 'Merkle Anchored';
+      }
     }
+
+    const displayType =
+      raw.type === 'POLICY_VALIDATION_FAILED' && typeof data.displayType === 'string'
+        ? data.displayType
+        : raw.type || 'UNKNOWN';
 
     const intentId =
       raw.intentId ||
@@ -142,7 +153,7 @@ export const LedgerTelemetryGrid: React.FC<LedgerTelemetryGridProps> = ({ blocke
       index: raw.index ?? 0,
       timestamp: raw.timestamp || new Date().toISOString(),
       formattedTime: formatTime(raw.timestamp),
-      type: raw.type || 'UNKNOWN',
+      type: displayType,
       referenceId: intentId || raw.mandateId || data.mandateId || 'SYSTEM',
       merchant,
       amount: rawAmount,
@@ -285,6 +296,11 @@ export const LedgerTelemetryGrid: React.FC<LedgerTelemetryGridProps> = ({ blocke
         setRowData((prev) => {
           const nextIndex = prev.length + 1;
           const blockedRow = parseBlockedEvent(blocked, nextIndex);
+          // Skip client-local duplicate if the backend SSE stream already delivered this rejection
+          const alreadyStreamed = prev.some(
+            (r) => !r.isClientObserved && r.intentId === blockedRow.intentId && r.type === blockedRow.type
+          );
+          if (alreadyStreamed) return prev;
           return [blockedRow, ...prev];
         });
       }

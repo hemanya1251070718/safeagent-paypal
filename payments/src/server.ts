@@ -390,6 +390,26 @@ export function createPaymentsApp(deps: PaymentsAppDeps = {}) {
     });
   });
 
+  // Ingest gateway policy/security telemetry events into the hash-chained SSE ledger
+  app.post('/ledger/events', (req, res) => {
+    const { type, mandateId, intentId, data } = (req.body || {}) as {
+      type?: string;
+      mandateId?: string;
+      intentId?: string;
+      data?: Record<string, any>;
+    };
+
+    if (type !== 'POLICY_VALIDATION_FAILED' && type !== 'SECURITY_ALERT') {
+      return res.status(400).json({
+        error: "type must be 'POLICY_VALIDATION_FAILED' or 'SECURITY_ALERT'"
+      });
+    }
+
+    const evt = ledger.append(type, data && typeof data === 'object' ? data : {}, mandateId, intentId);
+    broadcastSSE(evt);
+    return res.status(201).json({ recorded: true, event: evt });
+  });
+
   // Verify hash-chain integrity
   app.get('/ledger/verify', (req, res) => {
     res.json(ledger.getVerificationStatus());

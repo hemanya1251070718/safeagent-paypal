@@ -3,7 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { policyEngine } from './security/policyEngine.js';
 import { verifyMandateSignature } from './security/pqcVerifier.js';
-import { forwardOrderToPayments } from './services/paymentService.js';
+import { forwardOrderToPayments, emitPolicyRejectionToPayments } from './services/paymentService.js';
 import { rateLimiter } from './middleware/rateLimiter.js';
 import { SpendingMandate, CheckoutIntent } from '../../shared/dist/index.js';
 
@@ -135,6 +135,7 @@ app.post('/intents', async (req, res) => {
 
   // Case 3: Policy Rejection or Attack Quarantined (HTTP 422)
   if (!policy.valid) {
+    await emitPolicyRejectionToPayments(intent, policy.reasons, policy.sanitizationAlerts);
     return res.status(422).json({
       status: 'REJECTED_BY_GATEWAY',
       policyDecision: 'REJECTED',

@@ -92,6 +92,17 @@ export const CATALOG: MerchantProduct[] = [
     tags: ["monitor", "display", "budget", "screen", "zebronics", "1080p"]
   },
   {
+    id: "TECH-108",
+    merchant: "Amazon-India",
+    name: "AmazonBasics 18.5-inch HD LED Budget Monitor",
+    category: "electronics",
+    price: 1999,
+    currency: "INR",
+    inStock: true,
+    description: "Compact 18.5-inch HD display with HDMI input, built-in VESA mount, and low-power LED panel within Tier 1 budget cap.",
+    tags: ["monitor", "display", "budget", "screen", "hd", "amazonbasics"]
+  },
+  {
     id: "SONY-55",
     merchant: "Croma-Retail",
     name: "Sony Bravia 55-inch 4K Ultra HD Smart OLED TV",

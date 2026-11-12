@@ -70,6 +70,8 @@ export interface PlanExecutionResponse {
   }>;
   intent?: CheckoutIntent;
   gatewayDecision?: any;
+  initialRejectedDecision?: any;
+  recoveredFromCeiling?: boolean;
 }
 
 export interface CatalogProduct {

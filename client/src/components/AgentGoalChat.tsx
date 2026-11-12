@@ -44,6 +44,13 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
     goal: string;
     reason?: string;
   } | null>(null);
+  const [recoveryNotice, setRecoveryNotice] = useState<{
+    rejectedMerchant: string;
+    rejectedTotal: number;
+    recoveredMerchant: string;
+    recoveredTotal: number;
+    captureId?: string;
+  } | null>(null);
 
   const traceContainerRef = useRef<HTMLDivElement>(null);
   const traceBottomRef = useRef<HTMLDivElement>(null);
@@ -75,6 +82,7 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
     setErrorMessage(null);
     setBlockedNotice(null);
     setUnmatchedNotice(null);
+    setRecoveryNotice(null);
     setExpandedPayloads({});
   };
 
@@ -95,6 +103,7 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
     setErrorMessage(null);
     setBlockedNotice(null);
     setUnmatchedNotice(null);
+    setRecoveryNotice(null);
     setExpandedPayloads({});
 
     try {
@@ -202,6 +211,17 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
         response.gatewayDecision?.status === 'ACCEPTED_AND_CAPTURED' ||
         response.gatewayDecision?.policyDecision === 'APPROVED'
       ) {
+        if (response.recoveredFromCeiling && response.initialRejectedDecision) {
+          const rejIntent = response.initialRejectedDecision.intent || {};
+          const recIntent = response.intent || {};
+          setRecoveryNotice({
+            rejectedMerchant: rejIntent.merchant || 'Croma-Retail',
+            rejectedTotal: Number(rejIntent.total || 0),
+            recoveredMerchant: recIntent.merchant || 'Amazon-India',
+            recoveredTotal: Number(recIntent.total || 0),
+            captureId: response.gatewayDecision?.captureId
+          });
+        }
         onOrderCaptured?.();
       }
     } catch (err: any) {
@@ -346,6 +366,22 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
             <div className="text-[11px] text-amber-950 leading-relaxed">
               No verified items matching <strong className="text-ink">"{unmatchedNotice.goal}"</strong> were found in approved merchant stores. SafeAgent halted cart execution to protect your wallet from unintended purchases.
             </div>
+          </div>
+        )}
+
+        {/* Autonomous Ceiling Recovery Banner */}
+        {recoveryNotice && (
+          <div className="mb-3 p-3 rounded-lg bg-emerald-50/80 border-l-4 border-emerald-600 border border-emerald-200 text-xs space-y-1 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-emerald-900">
+                Ceiling Exceeded → Adapted &amp; Captured Within Budget
+              </span>
+              <span className="badge-success font-mono text-[10px]">Autonomous Recovery</span>
+            </div>
+            <p className="text-[11px] text-emerald-950 leading-relaxed">
+              <strong>{recoveryNotice.rejectedMerchant}</strong> (₹{recoveryNotice.rejectedTotal.toLocaleString('en-IN')}) triggered <code>CEILING REJECTED</code> → recovered with <strong>{recoveryNotice.recoveredMerchant}</strong> (₹{recoveryNotice.recoveredTotal.toLocaleString('en-IN')})
+              {recoveryNotice.captureId ? ` • Capture: ${recoveryNotice.captureId}` : ''}.
+            </p>
           </div>
         )}
       </div>

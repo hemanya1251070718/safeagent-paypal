@@ -20,6 +20,8 @@ export interface PlanExecutionResult {
   trace: ReasoningStep[];
   intent?: any;
   gatewayDecision?: any;
+  initialRejectedDecision?: any;
+  recoveredFromCeiling?: boolean;
   availableOptions?: any[];
 }
 
@@ -263,24 +265,43 @@ export class CognitivePlanner {
     log('GATEWAY_RESPONSE', `Gateway evaluated intent with policy status: ${submission.status}`, submission);
 
     // Step 5: Check if autonomous adaptation is needed (Scenario 4: Budget Recovery)
-    const isBudgetRejection = submission.policyDecision === 'REJECTED' && (
-      submission.reason?.includes('BUDGET_EXCEEDED') ||
-      submission.reason?.toLowerCase().includes('exceeds remaining mandate balance') ||
-      submission.reason?.toLowerCase().includes('budget') ||
-      submission.reason?.toLowerCase().includes('balance') ||
-      submission.reason?.toLowerCase().includes('max spend')
-    );
+    let initialRejectedDecision: any = undefined;
+    const isBudgetRejection =
+      (submission.policyDecision === 'REJECTED' || submission.status === 'CEILING_REJECTED') && (
+        submission.reason?.includes('BUDGET_EXCEEDED') ||
+        submission.reason?.toLowerCase().includes('exceeds remaining mandate balance') ||
+        submission.reason?.toLowerCase().includes('ceiling') ||
+        submission.reason?.toLowerCase().includes('budget') ||
+        submission.reason?.toLowerCase().includes('balance') ||
+        submission.reason?.toLowerCase().includes('max spend')
+      );
 
     if (isBudgetRejection) {
-      log('RECOVERY', `Gateway blocked intent due to budget cap. Initiating autonomous fallback discovery for lower-cost alternatives.`);
-      
-      // Determine allowed spending ceiling from Gateway feedback or mandate constraints
+      initialRejectedDecision = submission;
+      log('RECOVERY', `Gateway triggered CEILING REJECTED for ${cartResult.cart.merchant} (₹${cartResult.cart.total.toLocaleString('en-IN')}). Pausing briefly for telemetry sync before initiating autonomous recovery.`);
+
+      // Brief pacing delay (~900ms) so SSE telemetry visibly renders CEILING REJECTED before recovery capture events
+      await new Promise(resolve => setTimeout(resolve, 900));
+
+      // Determine allowed spending ceiling from Gateway mandate state, Gateway feedback, or fallback
       let allowedSpend = 15000.0;
       const budgetCapMatch = submission.reason?.match(/(?:max spend|balance|limit|cap)\s*(?:\()?(?:₹|rs\.?|inr|\$)?\s*([0-9,]+(?:\.[0-9]+)?)/i);
       if (budgetCapMatch && budgetCapMatch[1]) {
         allowedSpend = parseFloat(budgetCapMatch[1].replace(/,/g, ''));
       } else if (maxBudget) {
         allowedSpend = maxBudget;
+      }
+
+      try {
+        const mRes = await fetch(`${this.gatewayUrl}/mandates/${mandateId}`);
+        if (mRes.ok) {
+          const mData = await mRes.json();
+          if (mData && typeof mData.remainingBalance === 'number' && mData.remainingBalance > 0) {
+            allowedSpend = mData.remainingBalance;
+          }
+        }
+      } catch {
+        // Use parsed allowedSpend fallback when Gateway is offline
       }
 
       // Pre-tax ceiling taking into account 18% GST (price * 1.18 <= allowedSpend)
@@ -339,18 +360,20 @@ export class CognitivePlanner {
         chosenProduct.name.toLowerCase().includes(token)
       );
 
-      const validAlternatives = budgetSearch.products.filter(p => {
-        if (p.id === chosenProduct.id || p.price > maxPreTaxPrice) return false;
+      const validAlternatives = budgetSearch.products
+        .filter(p => {
+          if (p.id === chosenProduct.id || p.price > maxPreTaxPrice) return false;
 
-        if (targetType) {
-          const altHasType = (p.tags || []).some((t: string) => t.toLowerCase() === targetType) || p.name.toLowerCase().includes(targetType);
-          if (!altHasType) return false;
-        } else if (p.category !== chosenProduct.category) {
-          return false;
-        }
+          if (targetType) {
+            const altHasType = (p.tags || []).some((t: string) => t.toLowerCase() === targetType) || p.name.toLowerCase().includes(targetType);
+            if (!altHasType) return false;
+          } else if (p.category !== chosenProduct.category) {
+            return false;
+          }
 
-        return true;
-      });
+          return true;
+        })
+        .sort((a, b) => a.price - b.price);
 
       log('TOOL_RESULT', `Budget recovery search discovered ${validAlternatives.length} compliant options within policy limits.`, { count: validAlternatives.length, alternatives: validAlternatives });
 
@@ -379,12 +402,18 @@ export class CognitivePlanner {
             agentReasoning: `Autonomous recovery: Replaced over-budget item '${chosenProduct.name}' with compliant alternative '${altProduct.name}' (₹${altProduct.price} + 18% GST = ₹${altCart.cart.total}).`
           }, this.gatewayUrl);
 
-          log('GATEWAY_RESPONSE', `Revised intent evaluation: ${submission.status}`, submission);
+          log('GATEWAY_RESPONSE', `Revised intent evaluation: ${submission.status}${submission.captureId ? ` (Capture ID: ${submission.captureId})` : ''}`, submission);
         }
       } else {
         log('THOUGHT', `Autonomous recovery unable to locate alternative '${searchKeyword}' items under budget ceiling ₹${maxPreTaxPrice.toLocaleString('en-IN')}. Mandate spend ceiling policy rejection stands.`);
       }
     }
+
+    const recoveredFromCeiling = Boolean(
+      initialRejectedDecision &&
+      submission.policyDecision !== 'BLOCKED' &&
+      submission.policyDecision !== 'REJECTED'
+    );
 
     return {
       goal,
@@ -394,6 +423,8 @@ export class CognitivePlanner {
       trace,
       intent: submission.intent,
       gatewayDecision: submission,
+      initialRejectedDecision,
+      recoveredFromCeiling,
       availableOptions: searchResult.products.slice(0, 5)
     };
   }

@@ -5,6 +5,7 @@ export interface SearchOptions {
   category?: string;
   merchant?: string;
   includeOutOfStock?: boolean;
+  threshold?: number;
 }
 
 const STOP_WORDS = new Set(["find", "me", "an", "a", "the", "for", "under", "with", "to", "buy", "by", "get", "give", "i", "want", "of", "in", "best", "cheap", "good", "some"]);

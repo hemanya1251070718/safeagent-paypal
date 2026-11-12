@@ -126,6 +126,7 @@ RULES:
   let promptMsg = `Goal: "${goal}". Active Mandate ID: "${mandateId}". Please find the best item and submit the intent.`;
 
   let lastSubmissionResult: any = null;
+  let initialRejectedDecision: any = undefined;
 
   for (let turn = 0; turn < 6; turn++) {
     const result = await chat.sendMessage(promptMsg);
@@ -155,6 +156,12 @@ RULES:
       functionResponseData = await executeSubmitIntent(args, gatewayUrl);
       lastSubmissionResult = functionResponseData;
       log('GATEWAY_RESPONSE', `Gateway evaluated submitted intent: ${functionResponseData.status}`, functionResponseData);
+
+      if (functionResponseData.policyDecision === 'REJECTED') {
+        initialRejectedDecision = initialRejectedDecision || functionResponseData;
+        log('RECOVERY', `Gateway triggered CEILING REJECTED. Pausing briefly before selecting a cheaper in-budget alternative.`);
+        await new Promise(resolve => setTimeout(resolve, 900));
+      }
     } else {
       functionResponseData = { error: `Unknown function '${name}'` };
     }
@@ -170,6 +177,12 @@ RULES:
     });
   }
 
+  const recoveredFromCeiling = Boolean(
+    initialRejectedDecision &&
+    lastSubmissionResult?.policyDecision !== 'BLOCKED' &&
+    lastSubmissionResult?.policyDecision !== 'REJECTED'
+  );
+
   return {
     goal,
     mandateId,
@@ -177,7 +190,9 @@ RULES:
     finalStatus: lastSubmissionResult?.status || 'COMPLETED',
     trace,
     intent: lastSubmissionResult?.intent,
-    gatewayDecision: lastSubmissionResult
+    gatewayDecision: lastSubmissionResult,
+    initialRejectedDecision,
+    recoveredFromCeiling
   };
 }
 

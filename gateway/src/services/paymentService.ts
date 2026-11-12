@@ -77,3 +77,55 @@ export async function forwardOrderToPayments(
   }
 }
 
+/**
+ * Forward deterministic gateway policy rejections (e.g. CEILING REJECTED / ATTACK BLOCKED)
+ * to P4 Payments so the event is recorded in the hash-chained ledger and broadcast on SSE.
+ */
+export async function emitPolicyRejectionToPayments(
+  intent: CheckoutIntent,
+  reasons: string[],
+  sanitizationAlerts: string[]
+): Promise<void> {
+  const paymentsUrl =
+    process.env.PAYMENTS_SERVICE_URL ||
+    process.env.PAYMENTS_URL ||
+    'http://localhost:5000';
+
+  const isAttack =
+    sanitizationAlerts.length > 0 ||
+    reasons.some(r => {
+      const lower = r.toLowerCase();
+      return lower.includes('injection') || lower.includes('override') || lower.includes('rogue');
+    });
+
+  try {
+    await axios.post(
+      `${paymentsUrl}/ledger/events`,
+      {
+        type: 'POLICY_VALIDATION_FAILED',
+        mandateId: intent.mandateId,
+        intentId: intent.intentId,
+        data: {
+          displayType: isAttack ? 'ATTACK BLOCKED' : 'CEILING REJECTED',
+          alertType: isAttack ? 'PROMPT_INJECTION_BLOCKED' : 'CEILING_REJECTED',
+          tier: 3,
+          tierLabel: isAttack ? 'Tier 3 Attack' : 'Tier 3 Ceil Exc',
+          pqcStatus: isAttack ? 'Lattice Firebreak' : 'Policy Guarded',
+          merchant: intent.merchant,
+          amount: intent.total,
+          tax: intent.tax,
+          currency: intent.currency,
+          reasons,
+          sanitizationAlerts
+        }
+      },
+      {
+        timeout: 500,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+  } catch {
+    // Non-blocking: Payments service may be offline during isolated Gateway unit tests
+  }
+}
+
