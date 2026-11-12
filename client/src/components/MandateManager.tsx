@@ -331,7 +331,7 @@ export const MandateManager: React.FC<MandateManagerProps> = ({
                 onClick={() => setMaxSpend(preset)}
                 className={`text-[10px] font-mono px-2 py-0.5 rounded border transition ${
                   maxSpend === preset
-                    ? 'bg-accent text-white border-accent font-semibold shadow-xs'
+                    ? 'bg-emerald-800 text-white border-emerald-800 font-semibold shadow-sm'
                     : 'bg-surface border-border text-ink-muted hover:text-ink hover:bg-stone-50'
                 }`}
               >
@@ -381,7 +381,7 @@ export const MandateManager: React.FC<MandateManagerProps> = ({
                 onClick={() => setTier1Limit(preset)}
                 className={`text-[10px] font-mono px-2 py-0.5 rounded border transition ${
                   tier1Limit === preset
-                    ? 'bg-accent text-white border-accent font-semibold shadow-xs'
+                    ? 'bg-emerald-800 text-white border-emerald-800 font-semibold shadow-sm'
                     : 'bg-surface border-border text-ink-muted hover:text-ink hover:bg-stone-50'
                 }`}
               >
