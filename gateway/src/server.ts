@@ -250,9 +250,10 @@ app.post('/intents/:id/confirm', async (req, res) => {
 export { app, defaultMandate };
 
 const isTestEnv = process.env.NODE_ENV === 'test';
-if (!isTestEnv) {
-  app.listen(PORT, () => {
-    console.log(`\n🛡 SafeAgent Policy Gateway (P3) listening on http://localhost:${PORT}`);
+if (!isTestEnv && !process.env.CLOUD_RUN_UNIFIED) {
+  const HOST = process.env.HOST || '0.0.0.0';
+  app.listen(Number(PORT), HOST, () => {
+    console.log(`\n🛡 SafeAgent Policy Gateway (P3) listening on http://${HOST}:${PORT}`);
     console.log(`   Deterministic Trust Boundary active with default seed mandate: ${defaultMandate.mandateId}`);
     console.log(`   P4 Payments Service URL: ${process.env.PAYMENTS_SERVICE_URL || 'http://localhost:5000'}\n`);
   });

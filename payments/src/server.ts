@@ -578,15 +578,18 @@ export function createPaymentsApp(deps: PaymentsAppDeps = {}) {
   return { app, ledger, paypalService };
 }
 
+export { defaultLedger, defaultPayPalService };
+
 const isMainModule =
   typeof process.argv[1] === 'string' &&
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 if (isMainModule) {
+  const HOST = process.env.HOST || '0.0.0.0';
   const { app } = createPaymentsApp({ ledger: defaultLedger, paypalService: defaultPayPalService });
-  app.listen(PORT, () => {
-    console.log(`\n💳 SafeAgent Payments & Telemetry Service (P4) listening on http://localhost:${PORT}`);
-    console.log(`   Real-time SSE Stream ready at: http://localhost:${PORT}/ledger/stream\n`);
+  app.listen(Number(PORT), HOST, () => {
+    console.log(`\n💳 SafeAgent Payments & Telemetry Service (P4) listening on http://${HOST}:${PORT}`);
+    console.log(`   Real-time SSE Stream ready at: http://${HOST}:${PORT}/ledger/stream\n`);
   });
 }
 

@@ -7,10 +7,36 @@ import type {
 } from '../../../shared/dist/index.js';
 import { showToast } from '../components/Toast';
 
-// Base URLs derived strictly from environment variables with fallback defaults
-export const GATEWAY_URL = import.meta.env.VITE_GATEWAY_URL || 'http://localhost:3000';
-export const AGENT_URL = import.meta.env.VITE_AGENT_URL || 'http://localhost:4001';
-export const PAYMENTS_URL = import.meta.env.VITE_PAYMENTS_URL || 'http://localhost:5000';
+// Base URLs derived from environment variables or runtime hostname.
+// In local development (localhost / 127.0.0.1 on port 5173), fallback to separate service ports.
+// In production (Cloud Run / custom domain), fallback to relative URLs ('') so all requests route in-process on the same origin.
+const isLocalhost =
+  typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' ||
+   window.location.hostname === '127.0.0.1' ||
+   window.location.hostname === '0.0.0.0');
+
+export const GATEWAY_URL =
+  import.meta.env.VITE_GATEWAY_URL !== undefined && import.meta.env.VITE_GATEWAY_URL !== ''
+    ? import.meta.env.VITE_GATEWAY_URL
+    : isLocalhost
+    ? 'http://localhost:3000'
+    : '';
+
+export const AGENT_URL =
+  import.meta.env.VITE_AGENT_URL !== undefined && import.meta.env.VITE_AGENT_URL !== ''
+    ? import.meta.env.VITE_AGENT_URL
+    : isLocalhost
+    ? 'http://localhost:4001'
+    : '';
+
+export const PAYMENTS_URL =
+  import.meta.env.VITE_PAYMENTS_URL !== undefined && import.meta.env.VITE_PAYMENTS_URL !== ''
+    ? import.meta.env.VITE_PAYMENTS_URL
+    : isLocalhost
+    ? 'http://localhost:5000'
+    : '';
+
 export const ALLOW_DIRECT_CAPTURE = import.meta.env.VITE_ALLOW_DIRECT_CAPTURE === 'true';
 
 // Intercept unhandled network errors (ECONNREFUSED, offline services) and surface visible alerts

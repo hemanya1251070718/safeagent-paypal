@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { storeService } from '../src/catalog/storeService.js';
 import { semanticSearchService } from '../src/catalog/semanticSearch.js';
 import { executeBuildCart } from '../src/tools/buildCart.js';

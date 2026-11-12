@@ -90,9 +90,15 @@ app.post('/agent/scenario/:scenarioId', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`\n🤖 SafeAgent Cognitive Agent Service (P2) listening on http://localhost:${PORT}`);
-  console.log(`   Connected Gateway Target: ${process.env.GATEWAY_URL || 'http://localhost:3000'}`);
-  console.log(`   Ready to receive shopping goals and execute MCP tools.\n`);
-});
+export { app };
+
+const isMainModule = typeof process.argv[1] === 'string' && process.argv[1].endsWith('service.js') || process.argv[1]?.endsWith('service.ts');
+if (isMainModule || !process.env.CLOUD_RUN_UNIFIED) {
+  const HOST = process.env.HOST || '0.0.0.0';
+  app.listen(Number(PORT), HOST, () => {
+    console.log(`\n🤖 SafeAgent Cognitive Agent Service (P2) listening on http://${HOST}:${PORT}`);
+    console.log(`   Connected Gateway Target: ${process.env.GATEWAY_URL || 'http://localhost:3000'}`);
+    console.log(`   Ready to receive shopping goals and execute MCP tools.\n`);
+  });
+}
 

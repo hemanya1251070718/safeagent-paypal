@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "SafeAgent: Deterministic, Policy-Guarded Financial Proxy for Autonomous AI Agents on PayPal Rails",
   "private": true,
+  "type": "module",
   "scripts": {
     "build": "npm --prefix shared run build && npm --prefix gateway run build && npm --prefix agent run build && npm --prefix payments run build && npm --prefix client run build",
     "test": "npm --prefix gateway test && npm --prefix agent test",
@@ -12,6 +13,11 @@
     "start:gateway": "npm --prefix gateway run dev",
     "start:payments": "npm --prefix payments run dev",
     "start:client": "npm --prefix client run dev"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7"
   },
   "keywords": [
     "paypal",

@@ -1,0 +1,12 @@
+node_modules
+.git
+.gitignore
+dist
+*.log
+.DS_Store
+dbms_unit3_notes
+*.pdf
+write_batch*.py
+build_master_pdf.py
+get_cwh_playlist.py
+

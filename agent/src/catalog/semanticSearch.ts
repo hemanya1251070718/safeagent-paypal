@@ -36,7 +36,22 @@ class LocalTfidfEmbedder {
   }
 
   private tokenize(text: string): string[] {
-    return text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 1);
+    const rawTokens = text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 1);
+    const expanded: string[] = [];
+    const synonyms: Record<string, string[]> = {
+      'pointer': ['mouse'],
+      'cordless': ['wireless'],
+      'clicker': ['mouse'],
+      'earphones': ['headphones', 'earbuds'],
+      'display': ['monitor', 'screen']
+    };
+    for (const t of rawTokens) {
+      expanded.push(t);
+      if (synonyms[t]) {
+        expanded.push(...synonyms[t]);
+      }
+    }
+    return expanded;
   }
 
   private buildIndex(products: MerchantProduct[]) {
@@ -123,7 +138,7 @@ export class SemanticSearchService {
   private async getGeminiEmbedding(text: string): Promise<number[] | null> {
     if (!this.genAI || !this.hasApiKey) return null;
     try {
-      const model = this.genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
+      const model = this.genAI.getGenerativeModel({ model: 'text-embedding-004' });
       const res = await model.embedContent(text);
       return res.embedding.values;
     } catch {
@@ -133,12 +148,18 @@ export class SemanticSearchService {
 
   private async ensureProductEmbeddingsGemini() {
     if (!this.genAI || !this.hasApiKey || this.productEmbeddingCache.size > 0) return;
-    for (const p of CATALOG) {
-      const text = `${p.name}. Category: ${p.category}. ${p.description}. Tags: ${p.tags.join(', ')}`;
-      const vec = await this.getGeminiEmbedding(text);
-      if (vec) {
-        this.productEmbeddingCache.set(p.id, vec);
-      }
+    try {
+      await Promise.all(
+        CATALOG.map(async (p) => {
+          const text = `${p.name}. Category: ${p.category}. ${p.description}. Tags: ${p.tags.join(', ')}`;
+          const vec = await this.getGeminiEmbedding(text);
+          if (vec) {
+            this.productEmbeddingCache.set(p.id, vec);
+          }
+        })
+      );
+    } catch {
+      // Fallback cleanly to local TF-IDF
     }
   }
 
@@ -195,7 +216,7 @@ export class SemanticSearchService {
         }
       }
 
-      const threshold = engine === 'gemini-embedding' ? 0.65 : 0.20;
+      const threshold = options.threshold ?? (engine === 'gemini-embedding' ? 0.60 : 0.10);
       if (score > threshold) {
         scored.push({ product, score, engine });
       }
