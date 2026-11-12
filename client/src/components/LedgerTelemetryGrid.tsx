@@ -3,20 +3,16 @@ import { AgGridReact } from 'ag-grid-react';
 import {
   ModuleRegistry,
   AllCommunityModule,
-  themeQuartz,
-  colorSchemeDark
+  themeQuartz
 } from 'ag-grid-community';
 import type { ColDef } from 'ag-grid-community';
 import {
-  Activity,
   Download,
   ShieldCheck,
-  AlertTriangle,
   Search,
-  RefreshCw,
-  FileText,
   Lock,
-  Layers
+  Layers,
+  FileText
 } from 'lucide-react';
 
 import { getLedgerStreamUrl, getDisputePackage } from '../services/api';
@@ -27,8 +23,23 @@ import { showToast } from './Toast';
 // Register AG Grid Community modules (required for AG Grid v33)
 ModuleRegistry.registerModules([AllCommunityModule]);
 
-// Configure dark Quartz theme
-const darkTheme = themeQuartz.withPart(colorSchemeDark);
+// Configure custom light fintech Quartz theme matching the palette
+const lightFintechTheme = themeQuartz.withParams({
+  backgroundColor: '#FFFFFF',
+  foregroundColor: '#1C2430',
+  headerBackgroundColor: '#F6F4EE',
+  headerTextColor: '#6B7280',
+  headerFontSize: 11,
+  headerFontWeight: 600,
+  borderColor: '#E4E0D6',
+  rowBorder: { style: 'solid', width: 1, color: '#E4E0D6' },
+  rowHoverColor: '#FAF8F3',
+  selectedRowBackgroundColor: '#EAF5EE',
+  fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+  fontSize: 12,
+  rowHeight: 38,
+  headerHeight: 36
+});
 
 export interface LedgerTelemetryRow {
   id: string;
@@ -86,7 +97,7 @@ export const LedgerTelemetryGrid: React.FC<LedgerTelemetryGridProps> = ({ blocke
     const formattedAmount =
       rawAmount !== null ? formatCurrency(rawAmount, currency) : '—';
 
-    // Tax extraction: Real field or em-dash as per Phase 0 item f
+    // Tax extraction: Real field or em-dash
     const rawTax = typeof data.tax === 'number' ? data.tax : null;
     const formattedTax =
       rawTax !== null ? formatCurrency(rawTax, currency) : '—';
@@ -94,17 +105,17 @@ export const LedgerTelemetryGrid: React.FC<LedgerTelemetryGridProps> = ({ blocke
     // Merchant extraction
     const merchant =
       data.merchant ||
-      (Array.isArray(data.whitelist) ? `${data.whitelist.length} Stores Allowed` : '—');
+      (Array.isArray(data.whitelist) ? `${data.whitelist.length} stores` : '—');
 
     // Tier extraction
     let tierDisplay: string | number = '—';
     if (data.tier !== undefined && data.tier !== null) {
       tierDisplay = `Tier ${data.tier}`;
     } else if (raw.type === 'MANDATE_CREATED') {
-      tierDisplay = 'Policy Cap';
+      tierDisplay = 'Mandate';
     }
 
-    // Post-Quantum Cryptography status pill
+    // Post-Quantum Cryptography status
     let pqcStatus = '—';
     if (raw.type === 'MANDATE_CREATED') {
       pqcStatus = 'ML-DSA-65 Verified';
@@ -141,7 +152,7 @@ export const LedgerTelemetryGrid: React.FC<LedgerTelemetryGridProps> = ({ blocke
       currency,
       tier: tierDisplay,
       pqcStatus,
-      hash: raw.hash ? shortenHash(raw.hash, 12, 4) : 'GENESIS',
+      hash: raw.hash ? shortenHash(raw.hash, 10, 4) : 'GENESIS',
       rawHash: raw.hash || '',
       intentId,
       rawData: data
@@ -154,7 +165,7 @@ export const LedgerTelemetryGrid: React.FC<LedgerTelemetryGridProps> = ({ blocke
     const currency = intent.currency || null;
     const total = intent.total ?? null;
     const tax = intent.tax ?? null;
-    const merchant = intent.merchant || 'Unapproved Store';
+    const merchant = intent.merchant || 'Unapproved store';
     const intentId = intent.intentId || 'intent_blocked';
 
     return {
@@ -171,8 +182,8 @@ export const LedgerTelemetryGrid: React.FC<LedgerTelemetryGridProps> = ({ blocke
       formattedTax: tax !== null ? formatCurrency(tax, currency) : '—',
       currency,
       tier: 'Tier 3 Block',
-      pqcStatus: 'Lattice Firebreak Active',
-      hash: shortenHash(sha256Hex(JSON.stringify(blocked.gatewayDecision || blocked)), 12, 4),
+      pqcStatus: 'Lattice Firebreak',
+      hash: shortenHash(sha256Hex(JSON.stringify(blocked.gatewayDecision || blocked)), 10, 4),
       rawHash: '',
       isClientObserved: true,
       intentId,
@@ -180,7 +191,7 @@ export const LedgerTelemetryGrid: React.FC<LedgerTelemetryGridProps> = ({ blocke
     };
   };
 
-  // SSE Stream Connection with Exponential Backoff Reconnection & Event Deduplication
+  // Establish resilient SSE connection to Payments ledger stream
   useEffect(() => {
     let isSubscribed = true;
 
@@ -281,7 +292,6 @@ export const LedgerTelemetryGrid: React.FC<LedgerTelemetryGridProps> = ({ blocke
       rowData.find((r) => r.intentId && r.intentId.startsWith('intent'))?.intentId;
 
     if (!intentIdToExport) {
-      // Fallback: Export entire grid state with explicit local labeling
       downloadLocalDisputeFallback(
         'SafeAgent_Ledger_Export_Global_(not_Merkle_anchored).json',
         rowData,
@@ -292,7 +302,6 @@ export const LedgerTelemetryGrid: React.FC<LedgerTelemetryGridProps> = ({ blocke
     }
 
     try {
-      // Phase 0 item g passed: call real dispute package endpoint through api.ts
       const disputePackage = await getDisputePackage(intentIdToExport);
       const jsonStr = JSON.stringify(disputePackage, null, 2);
       const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -302,7 +311,7 @@ export const LedgerTelemetryGrid: React.FC<LedgerTelemetryGridProps> = ({ blocke
       a.download = `SafeAgent_Merkle_Dispute_${disputePackage.intentId}_${Date.now()}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      setExportNotice(`✓ Cryptographic Merkle Dispute Package downloaded for ${disputePackage.intentId}`);
+      setExportNotice(`Downloaded Merkle dispute package for ${disputePackage.intentId}`);
       showToast({
         type: 'success',
         title: 'Merkle Dispute Exported',
@@ -342,56 +351,55 @@ export const LedgerTelemetryGrid: React.FC<LedgerTelemetryGridProps> = ({ blocke
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-    setExportNotice(`Notice: Downloaded local export for ${filename}`);
+    setExportNotice(`Downloaded local export: ${filename}`);
   };
 
-  // AG Grid Column Definitions
+  // AG Grid Column Definitions with refined, calm styling
   const columnDefs: ColDef<LedgerTelemetryRow>[] = useMemo(
     () => [
       {
         field: 'index',
         headerName: '#',
-        width: 65,
-        sortable: true
+        width: 55,
+        sortable: true,
+        cellClass: 'text-ink-muted text-xs'
       },
       {
         field: 'formattedTime',
         headerName: 'Time',
-        width: 95,
-        sortable: true
+        width: 90,
+        sortable: true,
+        cellClass: 'text-ink-muted text-xs font-mono'
       },
       {
         field: 'type',
-        headerName: 'Event Type',
-        width: 210,
+        headerName: 'Event type',
+        width: 200,
         sortable: true,
         filter: true,
         cellRenderer: (params: any) => {
           const type: string = params.value || 'UNKNOWN';
 
-          let badgeClass = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+          let badgeClass = 'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-stone-100 text-stone-700 border border-stone-200';
           if (
             type.includes('CAPTURED') ||
             type.includes('PASSED') ||
             type.includes('SETTLED')
           ) {
-            badgeClass = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+            badgeClass = 'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200';
           } else if (type.includes('CONFIRMATION')) {
-            badgeClass = 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
-          } else if (type.includes('BLOCKED')) {
-            badgeClass = 'bg-purple-500/15 text-purple-300 border-purple-500/40 animate-pulse';
+            badgeClass = 'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200';
           } else if (
+            type.includes('BLOCKED') ||
             type.includes('FAILED') ||
             type.includes('ALERT') ||
             type.includes('REJECTED')
           ) {
-            badgeClass = 'bg-red-500/10 text-red-400 border-red-500/20';
+            badgeClass = 'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-800 border border-rose-200';
           }
 
           return (
-            <span
-              className={`px-2 py-0.5 rounded-full text-[10px] font-mono border font-semibold inline-block ${badgeClass}`}
-            >
+            <span className={badgeClass}>
               {type}
             </span>
           );
@@ -403,42 +411,42 @@ export const LedgerTelemetryGrid: React.FC<LedgerTelemetryGridProps> = ({ blocke
         width: 140,
         sortable: true,
         filter: true,
-        cellClass: 'text-slate-300 text-xs truncate'
+        cellClass: 'text-ink text-xs font-medium truncate'
       },
       {
         field: 'formattedAmount',
         headerName: 'Amount',
         width: 110,
         sortable: true,
-        cellClass: 'font-mono text-white text-xs'
+        cellClass: 'font-mono text-ink font-semibold text-xs'
       },
       {
         field: 'formattedTax',
-        headerName: 'Tax (GST 18%)',
-        width: 115,
+        headerName: 'Tax',
+        width: 95,
         sortable: true,
-        cellClass: 'font-mono text-slate-400 text-xs'
+        cellClass: 'font-mono text-ink-muted text-xs'
       },
       {
         field: 'tier',
         headerName: 'Tier',
-        width: 105,
+        width: 100,
         sortable: true,
         cellRenderer: (params: any) => {
           const val: string = String(params.value || '—');
-          if (val === '—') return <span className="text-slate-500 text-xs">—</span>;
+          if (val === '—') return <span className="text-ink-subtle text-xs">—</span>;
 
-          let colorClass = 'bg-slate-800 text-slate-400 border-slate-700';
+          let badgeStyle = 'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-stone-100 text-stone-700 border border-stone-200';
           if (val.includes('1')) {
-            colorClass = 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30';
+            badgeStyle = 'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sky-50 text-sky-800 border border-sky-200';
           } else if (val.includes('2')) {
-            colorClass = 'bg-amber-500/10 text-amber-300 border-amber-500/30';
+            badgeStyle = 'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200';
           } else if (val.includes('3') || val.includes('Block')) {
-            colorClass = 'bg-red-500/10 text-red-300 border-red-500/30';
+            badgeStyle = 'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-800 border border-rose-200';
           }
 
           return (
-            <span className={`px-2 py-0.5 rounded-md text-[10px] font-mono border font-medium ${colorClass}`}>
+            <span className={badgeStyle}>
               {val}
             </span>
           );
@@ -446,33 +454,33 @@ export const LedgerTelemetryGrid: React.FC<LedgerTelemetryGridProps> = ({ blocke
       },
       {
         field: 'pqcStatus',
-        headerName: 'PQC Status',
-        width: 175,
+        headerName: 'PQC status',
+        width: 165,
         sortable: true,
         cellRenderer: (params: any) => {
           const val: string = params.value || '—';
-          if (val === '—') return <span className="text-slate-500 text-xs">—</span>;
+          if (val === '—') return <span className="text-ink-subtle text-xs">—</span>;
 
           if (val.includes('ML-DSA-65')) {
             return (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-semibold">
-                <ShieldCheck className="h-3 w-3 text-emerald-400 shrink-0" />
-                <span>ML-DSA-65 Verified</span>
+              <span className="badge-success">
+                <ShieldCheck className="h-3 w-3 text-accent" />
+                <span>ML-DSA-65</span>
               </span>
             );
           }
 
           if (val.includes('Lattice Firebreak')) {
             return (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/15 text-purple-300 border border-purple-500/30 font-semibold">
-                <Lock className="h-3 w-3 text-purple-400 shrink-0" />
-                <span>Lattice Firebreak</span>
+              <span className="badge-danger">
+                <Lock className="h-3 w-3 text-danger" />
+                <span>Firebreak</span>
               </span>
             );
           }
 
           return (
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-slate-800 text-slate-400 border border-slate-700">
+            <span className="badge-neutral">
               {val}
             </span>
           );
@@ -480,30 +488,30 @@ export const LedgerTelemetryGrid: React.FC<LedgerTelemetryGridProps> = ({ blocke
       },
       {
         field: 'hash',
-        headerName: 'SHA-256 Hash',
-        width: 135,
-        cellClass: 'font-mono text-cyan-400 text-xs'
+        headerName: 'SHA-256 hash',
+        width: 125,
+        cellClass: 'font-mono text-ink-muted text-xs'
       },
       {
         headerName: 'Actions',
-        width: 120,
+        width: 110,
         sortable: false,
         cellRenderer: (params: any) => {
           const row: LedgerTelemetryRow = params.data;
           const targetIntentId = row.intentId;
 
           if (!targetIntentId) {
-            return <span className="text-slate-600 text-[10px]">—</span>;
+            return <span className="text-ink-subtle text-[11px]">—</span>;
           }
 
           return (
             <button
               onClick={() => exportDisputeForIntent(targetIntentId)}
-              title="Download Merkle dispute package for this intent"
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] border border-slate-700 transition"
+              title="Download Merkle dispute proof for this intent"
+              className="btn-secondary text-[10px] py-0.5 px-2 font-mono"
             >
-              <Download className="h-3 w-3 text-cyan-400" />
-              <span>Export Proof</span>
+              <Download className="h-2.5 w-2.5 text-ink-muted" />
+              <span>Proof</span>
             </button>
           );
         }
@@ -513,103 +521,93 @@ export const LedgerTelemetryGrid: React.FC<LedgerTelemetryGridProps> = ({ blocke
   );
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+    <div className="fintech-card p-5 sm:p-6 space-y-4">
       {/* Header Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-3">
-        <div className="flex items-center space-x-2.5">
-          <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-            <Activity className="h-5 w-5" />
-          </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <h2 className="font-bold text-lg text-white">
-                Real-Time Financial Telemetry Ledger
-              </h2>
-              <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
-                AG Grid v33 Quartz
-              </span>
-            </div>
-            <p className="text-xs text-slate-400">
-              Append-only immutable audit trail streaming PayPal captures, ML-DSA-65 proofs & lattice firebreaks
-            </p>
-          </div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
+        <div>
+          <span className="eyebrow">Audit & Settlement</span>
+          <h2 className="heading-section mt-0.5">Financial Telemetry Ledger</h2>
+          <p className="text-xs text-ink-muted mt-0.5">
+            Append-only hash-chained ledger streaming live PayPal captures and cryptographic proofs.
+          </p>
         </div>
 
-        {/* Status Badge, Counter, & Export Dispute Button */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        {/* Toolbar Right: Status, Counter & Export */}
+        <div className="flex items-center gap-2.5">
           {/* Connection Status Badge */}
-          <span
-            className={`text-xs px-2.5 py-1 rounded-full font-mono flex items-center gap-1.5 border transition-all ${
+          <div
+            className={`flex items-center gap-1.5 text-xs px-2.5 py-0.5 rounded-full border ${
               connectionStatus === 'CONNECTED'
-                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                 : connectionStatus === 'RECONNECTING'
-                ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
-                : 'bg-red-500/10 text-red-400 border-red-500/20'
+                ? 'bg-amber-50 text-amber-800 border-amber-200'
+                : 'bg-stone-100 text-stone-600 border-stone-200'
             }`}
           >
             <span
-              className={`h-2 w-2 rounded-full ${
+              className={`h-1.5 w-1.5 rounded-full ${
                 connectionStatus === 'CONNECTED'
-                  ? 'bg-emerald-400 animate-pulse'
+                  ? 'bg-emerald-500 animate-pulse'
                   : connectionStatus === 'RECONNECTING'
-                  ? 'bg-amber-400 animate-ping'
-                  : 'bg-red-400'
+                  ? 'bg-amber-500 animate-ping'
+                  : 'bg-stone-400'
               }`}
             />
-            {connectionStatus === 'CONNECTED'
-              ? 'SSE Live Feed Connected'
-              : connectionStatus === 'RECONNECTING'
-              ? 'Reconnecting Stream...'
-              : 'Stream Offline'}
-          </span>
+            <span className="font-semibold text-[11px]">
+              {connectionStatus === 'CONNECTED'
+                ? 'SSE Live'
+                : connectionStatus === 'RECONNECTING'
+                ? 'Reconnecting'
+                : 'Offline'}
+            </span>
+          </div>
 
           {/* Event Counter Badge */}
-          <span className="text-xs font-mono px-2.5 py-1 rounded-full bg-slate-800/80 text-slate-300 border border-slate-700/80 flex items-center gap-1.5">
-            <Layers className="h-3.5 w-3.5 text-cyan-400" />
-            <span>{rowData.length} Events Logged</span>
+          <span className="text-xs font-mono text-emerald-950 bg-emerald-50/70 px-2.5 py-0.5 rounded-full border border-emerald-200/80 font-medium">
+            {rowData.length} events
           </span>
 
-          {/* Global Merkle Dispute Export Button */}
+          {/* Global Dispute Export Button */}
           <button
             onClick={() => exportDisputeForIntent()}
             disabled={isExporting}
-            className="flex items-center space-x-1.5 bg-gradient-to-r from-blue-700 to-cyan-600 hover:from-blue-600 hover:to-cyan-500 text-white text-xs px-3.5 py-1.5 rounded-xl border border-cyan-500/30 transition shadow-md shadow-blue-500/10 disabled:opacity-50"
+            className="btn-secondary text-xs hover:border-amber-300 hover:bg-amber-50/60 text-amber-950 font-medium"
           >
-            <Download className="h-3.5 w-3.5" />
-            <span>{isExporting ? 'Generating Proof...' : 'Export Merkle Dispute Package'}</span>
+            <Download className="h-3.5 w-3.5 text-amber-700" />
+            <span>Export dispute package</span>
           </button>
         </div>
       </div>
 
       {/* Export Notification Banner */}
       {exportNotice && (
-        <div className="mb-3 p-2.5 rounded-xl bg-cyan-950/70 border border-cyan-500/40 text-cyan-300 text-xs flex items-center gap-2 animate-in fade-in">
-          <FileText className="h-4 w-4 shrink-0 text-cyan-400" />
+        <div className="p-2.5 rounded bg-page border border-border text-ink text-xs flex items-center gap-2">
+          <FileText className="h-3.5 w-3.5 text-accent shrink-0" />
           <span>{exportNotice}</span>
         </div>
       )}
 
       {/* Quick Filter Search Bar */}
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+      <div className="flex items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-xs">
+          <Search className="h-3.5 w-3.5 text-ink-muted absolute left-2.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={quickFilter}
             onChange={(e) => setQuickFilter(e.target.value)}
-            placeholder="Quick search events, merchants, hashes, tiers..."
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-sans"
+            placeholder="Search events, merchants, hashes..."
+            className="input-text w-full pl-8 text-xs"
           />
         </div>
-        <div className="text-[11px] text-slate-500 hidden sm:block">
-          Click any row's <strong className="text-cyan-400 font-mono">Export Proof</strong> to download its Merkle dispute receipt
-        </div>
+        <span className="text-[11px] text-ink-muted hidden sm:inline">
+          Click <strong className="font-mono text-ink">Proof</strong> to download Merkle dispute receipt
+        </span>
       </div>
 
       {/* AG Grid v33 High-Throughput Data Table */}
-      <div className="w-full h-80 rounded-xl overflow-hidden border border-slate-800 shadow-inner">
+      <div className="w-full h-84 rounded border border-border overflow-hidden">
         <AgGridReact<LedgerTelemetryRow>
-          theme={darkTheme}
+          theme={lightFintechTheme}
           rowData={rowData}
           columnDefs={columnDefs}
           defaultColDef={{
@@ -619,6 +617,9 @@ export const LedgerTelemetryGrid: React.FC<LedgerTelemetryGridProps> = ({ blocke
           quickFilterText={quickFilter}
           rowSelection={{ mode: 'singleRow' }}
           animateRows={true}
+          getRowClass={(params) =>
+            params.data?.isClientObserved ? 'bg-[#FDF3F1]' : ''
+          }
         />
       </div>
     </div>

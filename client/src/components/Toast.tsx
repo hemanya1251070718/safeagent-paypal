@@ -56,39 +56,39 @@ export const ToastContainer: React.FC = () => {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col space-y-2.5 max-w-sm w-full pointer-events-none px-4 sm:px-0">
+    <div className="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 max-w-sm w-full pointer-events-none px-4 sm:px-0">
       {toasts.map((toast) => {
-        let borderClass = 'border-slate-700 bg-slate-900/95';
-        let icon = <Info className="h-5 w-5 text-blue-400 shrink-0" />;
+        let borderClass = 'border-l-4 border-l-slate-info';
+        let icon = <Info className="h-4 w-4 text-slate-info shrink-0 mt-0.5" />;
 
         if (toast.type === 'error') {
-          borderClass = 'border-rose-500/40 bg-rose-950/95 text-rose-100 shadow-rose-950/50';
-          icon = <AlertCircle className="h-5 w-5 text-rose-400 shrink-0" />;
+          borderClass = 'border-l-4 border-l-danger';
+          icon = <AlertCircle className="h-4 w-4 text-danger shrink-0 mt-0.5" />;
         } else if (toast.type === 'success') {
-          borderClass = 'border-emerald-500/40 bg-emerald-950/95 text-emerald-100 shadow-emerald-950/50';
-          icon = <CheckCircle className="h-5 w-5 text-emerald-400 shrink-0" />;
+          borderClass = 'border-l-4 border-l-success';
+          icon = <CheckCircle className="h-4 w-4 text-success shrink-0 mt-0.5" />;
         } else if (toast.type === 'warning') {
-          borderClass = 'border-amber-500/40 bg-amber-950/95 text-amber-100 shadow-amber-950/50';
-          icon = <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0" />;
+          borderClass = 'border-l-4 border-l-saffron';
+          icon = <AlertTriangle className="h-4 w-4 text-saffron shrink-0 mt-0.5" />;
         }
 
         return (
           <div
             key={toast.id}
-            className={`pointer-events-auto border rounded-xl p-3.5 shadow-xl backdrop-blur-md flex items-start space-x-3 transition-all duration-200 animate-in slide-in-from-bottom-2 ${borderClass}`}
+            className={`pointer-events-auto bg-surface text-ink border border-border rounded-md p-3 shadow-floating flex items-start space-x-3 transition-all duration-200 animate-in slide-in-from-bottom-2 ${borderClass}`}
           >
             {icon}
             <div className="flex-1 min-w-0 pr-1">
-              <h4 className="text-xs font-bold leading-tight tracking-tight text-white">{toast.title}</h4>
+              <h4 className="text-xs font-medium leading-tight text-ink">{toast.title}</h4>
               {toast.message && (
-                <p className="text-[11px] text-slate-300 mt-1 leading-normal break-words">
+                <p className="text-[11px] text-ink-muted mt-1 leading-normal break-words">
                   {toast.message}
                 </p>
               )}
             </div>
             <button
               onClick={() => removeToast(toast.id)}
-              className="text-slate-400 hover:text-white p-0.5 rounded transition shrink-0"
+              className="text-ink-muted hover:text-ink p-0.5 rounded transition shrink-0"
               aria-label="Dismiss toast"
             >
               <X className="h-3.5 w-3.5" />

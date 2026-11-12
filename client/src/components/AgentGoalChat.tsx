@@ -1,64 +1,56 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Send,
-  Bot,
-  Sparkles,
   AlertTriangle,
-  ShieldCheck,
-  ArrowRight,
-  Trash2,
-  Terminal,
-  CheckCircle2,
-  RefreshCw,
+  RotateCcw,
   ShieldAlert,
   Code2,
   ChevronDown,
   ChevronUp,
-  Brain,
-  HelpCircle
+  Bot
 } from 'lucide-react';
 import { dispatchPlan, triggerScenario } from '../services/api';
-import { extractIntentCart, formatTime } from '../utils/formatters';
+import { formatTime } from '../utils/formatters';
 
 interface AgentGoalChatProps {
   mandateId: string;
-  onBiometricRequired: (intent: any) => void;
-  onIntentBlocked?: (blocked: any) => void;
   externalGoal?: string;
+  onBiometricRequired?: (intent: any) => void;
+  onIntentBlocked?: (blockedEvent: any) => void;
 }
 
 export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
   mandateId,
+  externalGoal,
   onBiometricRequired,
-  onIntentBlocked,
-  externalGoal
+  onIntentBlocked
 }) => {
   const [goal, setGoal] = useState<string>('');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [trace, setTrace] = useState<any[]>([]);
-  const [finalStatus, setFinalStatus] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [finalStatus, setFinalStatus] = useState<string | null>(null);
   const [expandedPayloads, setExpandedPayloads] = useState<Record<number, boolean>>({});
   const [blockedNotice, setBlockedNotice] = useState<{
-    hostilePayload?: string;
-    reason?: string;
-    merchant?: string;
+    reason: string;
+    hostilePayload: string;
+    merchant: string;
   } | null>(null);
 
   const traceContainerRef = useRef<HTMLDivElement>(null);
   const traceBottomRef = useRef<HTMLDivElement>(null);
 
-  // Sync external goal selection (e.g. from Merchant Catalog)
+  // Sync externalGoal from Catalog drawer if clicked
   useEffect(() => {
     if (externalGoal) {
       setGoal(externalGoal);
     }
   }, [externalGoal]);
 
-  // Auto-scroll as reasoning steps arrive
+  // Auto-scroll trace container on new items
   useEffect(() => {
     if (traceBottomRef.current) {
-      traceBottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      traceBottomRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [trace, isLoading, blockedNotice]);
 
@@ -122,34 +114,38 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
           response.gatewayDecision?.intent?.items?.[0] ||
           tracePayloadItem;
 
-        const payloadText = hostileItem?.description || hostileItem?.name || null;
-        const reasonText =
-          response.gatewayDecision?.reasons?.join('; ') ||
+        const reason =
           response.gatewayDecision?.reason ||
-          null;
-        const merchantText =
-          response.intent?.merchant ||
-          response.gatewayDecision?.intent?.merchant ||
-          null;
+          response.gatewayDecision?.sanitizationAlerts?.[0] ||
+          response.reason ||
+          'Policy violation: untrusted seller instruction injection detected in product catalog listing.';
+
+        const listingText =
+          hostileItem?.description ||
+          hostileItem?.name ||
+          (response.rawPayload ? JSON.stringify(response.rawPayload) : null);
 
         setBlockedNotice({
-          hostilePayload: payloadText || 'Blocked by gateway (payload details unavailable)',
-          reason: reasonText || 'Blocked by gateway (payload details unavailable)',
-          merchant: merchantText || '—'
+          reason: reason,
+          hostilePayload: listingText || 'Blocked by gateway (payload details unavailable)',
+          merchant: hostileItem?.merchant || response.intent?.merchant || '—'
         });
       }
 
-      if (response.gatewayDecision?.status === 'HELD_FOR_CONFIRMATION') {
-        const intentCart = extractIntentCart(response);
-        if (intentCart) {
-          onBiometricRequired({
-            ...intentCart,
-            gatewayReasons: response.gatewayDecision?.reasons || response.gatewayDecision?.gatewayResponse?.reasons,
-            tier: response.gatewayDecision?.tier || 2,
-            tier1Limit: response.gatewayDecision?.tier1Limit
-          });
+      // Check for Biometric escalation
+      if (
+        response.finalStatus === 'PENDING_CONFIRMATION' ||
+        response.gatewayDecision?.policyDecision === 'ESCALATE_BIOMETRIC' ||
+        response.intent?.status === 'PENDING_CONFIRMATION'
+      ) {
+        const intentToConfirm = response.intent || response.gatewayDecision?.intent;
+        if (intentToConfirm && onBiometricRequired) {
+          onBiometricRequired(intentToConfirm);
         }
-      } else if (
+      }
+
+      // Record blocked event to parent for ledger telemetry if rejected
+      if (
         response.finalStatus === 'REJECTED_BY_GATEWAY' ||
         response.gatewayDecision?.policyDecision === 'REJECTED' ||
         response.gatewayDecision?.policyDecision === 'BLOCKED'
@@ -172,154 +168,143 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
   };
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col h-[580px]">
-      {/* Header with Title and Clear Button */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center space-x-2.5">
-          <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-            <Bot className="h-5 w-5" />
-          </div>
+    <div className="fintech-card p-5 sm:p-6 flex flex-col h-[580px] justify-between">
+      <div>
+        {/* Header with Title and Clear Button */}
+        <div className="flex items-start justify-between border-b border-border pb-3 mb-3">
           <div>
-            <h2 className="font-bold text-lg text-white flex items-center gap-2">
-              <span>Cognitive Agent Planner</span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
-                P2 Untrusted
-              </span>
-            </h2>
-            <p className="text-xs text-slate-400">Autonomous reasoning, catalog discovery & MCP cart synthesis</p>
+            <span className="eyebrow text-sky-800 font-semibold tracking-wider">Planner</span>
+            <h2 className="heading-section mt-0.5">Cognitive Agent</h2>
+            <p className="text-xs text-ink-muted mt-0.5">
+              Natural language planner with catalog exploration (holds zero credentials).
+            </p>
           </div>
+
+          {trace.length > 0 && (
+            <button
+              onClick={handleClearTrace}
+              className="btn-secondary text-xs py-1 px-2.5 hover:bg-stone-100"
+              title="Clear reasoning trace"
+            >
+              <RotateCcw className="h-3 w-3 text-ink-muted" />
+              <span>Reset</span>
+            </button>
+          )}
         </div>
 
-        {trace.length > 0 && (
+        {/* Polished Semantic Scenario Trigger Buttons */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
           <button
-            onClick={handleClearTrace}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-xs border border-slate-700/60 transition"
-            title="Clear reasoning trace"
+            onClick={() => executeGoal(undefined, 'tier1')}
+            disabled={isLoading}
+            className="bg-emerald-50/70 hover:bg-emerald-100/70 border border-emerald-200/90 text-emerald-950 rounded-lg p-2.5 transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98] text-left flex flex-col justify-between shadow-2xs group cursor-pointer"
           >
-            <Trash2 className="h-3.5 w-3.5" />
-            <span>Clear</span>
+            <div className="flex items-center justify-between w-full">
+              <span className="font-semibold text-emerald-900 text-xs">1. Tier 1 auto</span>
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+            </div>
+            <span className="text-[10px] text-emerald-800/80 mt-1 leading-tight">Small mouse (&lt; limit)</span>
           </button>
+
+          <button
+            onClick={() => executeGoal(undefined, 'tier2')}
+            disabled={isLoading}
+            className="bg-sky-50/70 hover:bg-sky-100/70 border border-sky-200/90 text-sky-950 rounded-lg p-2.5 transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98] text-left flex flex-col justify-between shadow-2xs group cursor-pointer"
+          >
+            <div className="flex items-center justify-between w-full">
+              <span className="font-semibold text-sky-900 text-xs">2. Tier 2 confirm</span>
+              <span className="h-1.5 w-1.5 rounded-full bg-sky-500"></span>
+            </div>
+            <span className="text-[10px] text-sky-800/80 mt-1 leading-tight">Keyboard (passkey)</span>
+          </button>
+
+          <button
+            onClick={() => executeGoal(undefined, 'injection')}
+            disabled={isLoading}
+            className="bg-rose-50/70 hover:bg-rose-100/70 border border-rose-200 text-rose-950 rounded-lg p-2.5 transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98] text-left flex flex-col justify-between shadow-2xs group cursor-pointer"
+          >
+            <div className="flex items-center justify-between w-full">
+              <span className="font-semibold text-danger text-xs">3. Injection</span>
+              <span className="h-1.5 w-1.5 rounded-full bg-danger"></span>
+            </div>
+            <span className="text-[10px] text-rose-800/80 mt-1 leading-tight">Hostile USB exploit</span>
+          </button>
+
+          <button
+            onClick={() => executeGoal(undefined, 'budget')}
+            disabled={isLoading}
+            className="bg-amber-50/70 hover:bg-amber-100/70 border border-amber-200/90 text-amber-950 rounded-lg p-2.5 transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98] text-left flex flex-col justify-between shadow-2xs group cursor-pointer"
+          >
+            <div className="flex items-center justify-between w-full">
+              <span className="font-semibold text-amber-900 text-xs">4. Over budget</span>
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+            </div>
+            <span className="text-[10px] text-amber-800/80 mt-1 leading-tight">Limit adaptation</span>
+          </button>
+        </div>
+
+        {/* Error Alert Banner */}
+        {errorMessage && (
+          <div className="mb-3 p-2.5 rounded-md bg-danger-light border border-[#F0C6BF] text-danger text-xs flex items-center space-x-2">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-danger" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
+
+        {/* Serious Hostile Injection Callout Card */}
+        {blockedNotice && (
+          <div className="mb-3 p-3.5 rounded-lg bg-rose-50/80 border-l-4 border-danger border border-rose-200 text-xs space-y-2 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <span className="font-bold flex items-center gap-1.5 text-danger">
+                <ShieldAlert className="h-4 w-4" />
+                <span>Adversarial Prompt Injection Blocked</span>
+              </span>
+              <span className="badge-danger font-mono text-[10px]">Policy Firebreak</span>
+            </div>
+
+            <div className="code-box bg-white p-2 text-[11px] leading-relaxed border-rose-200">
+              <span className="text-danger font-semibold block mb-0.5">Intercepted listing payload:</span>
+              <code>{blockedNotice.hostilePayload}</code>
+            </div>
+
+            <div className="text-[11px] text-ink-muted leading-normal">
+              <strong className="text-danger font-semibold">Gateway reason: </strong>
+              <span>{blockedNotice.reason}</span>
+              {blockedNotice.merchant !== '—' && (
+                <span className="block mt-0.5 text-ink-muted">
+                  Merchant: <strong className="text-ink">{blockedNotice.merchant}</strong>
+                </span>
+              )}
+            </div>
+          </div>
         )}
       </div>
 
-      {/* Preset Scenario Quick-Triggers */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
-        <button
-          onClick={() => executeGoal(undefined, 'tier1')}
-          disabled={isLoading}
-          className="text-left p-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 hover:border-blue-500/50 transition text-xs group disabled:opacity-50"
-        >
-          <div className="flex items-center justify-between font-semibold text-blue-400 mb-0.5">
-            <span>Scenario 1</span>
-            <ArrowRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-          </div>
-          <div className="text-[11px] text-slate-300 font-medium truncate">Tier 1 Micro-Tx</div>
-          <div className="text-[9px] text-slate-500">Wireless mouse (Tier 1 Auto)</div>
-        </button>
-
-        <button
-          onClick={() => executeGoal(undefined, 'tier2')}
-          disabled={isLoading}
-          className="text-left p-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 hover:border-yellow-500/50 transition text-xs group disabled:opacity-50"
-        >
-          <div className="flex items-center justify-between font-semibold text-yellow-400 mb-0.5">
-            <span>Scenario 2</span>
-            <ArrowRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-          </div>
-          <div className="text-[11px] text-slate-300 font-medium truncate">Tier 2 Discretionary</div>
-          <div className="text-[9px] text-slate-500">Keychron Keyboard (Passkey)</div>
-        </button>
-
-        <button
-          onClick={() => executeGoal(undefined, 'injection')}
-          disabled={isLoading}
-          className="text-left p-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 hover:border-red-500/50 transition text-xs group disabled:opacity-50"
-        >
-          <div className="flex items-center justify-between font-semibold text-red-400 mb-0.5">
-            <span>Scenario 3</span>
-            <ArrowRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-          </div>
-          <div className="text-[11px] text-slate-300 font-medium truncate">Hostile Injection</div>
-          <div className="text-[9px] text-slate-500">Rogue USB exploit (Blocked)</div>
-        </button>
-
-        <button
-          onClick={() => executeGoal(undefined, 'budget')}
-          disabled={isLoading}
-          className="text-left p-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 hover:border-purple-500/50 transition text-xs group disabled:opacity-50"
-        >
-          <div className="flex items-center justify-between font-semibold text-purple-400 mb-0.5">
-            <span>Scenario 4</span>
-            <ArrowRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-          </div>
-          <div className="text-[11px] text-slate-300 font-medium truncate">Budget Recovery</div>
-          <div className="text-[9px] text-slate-500">Budget limit recovery</div>
-        </button>
-      </div>
-
-      {/* Error Alert Banner */}
-      {errorMessage && (
-        <div className="mb-3 p-3 rounded-xl bg-red-950/80 border border-red-500/50 text-red-300 text-xs flex items-center space-x-2 animate-in fade-in">
-          <AlertTriangle className="h-4 w-4 shrink-0 text-red-400" />
-          <span>{errorMessage}</span>
-        </div>
-      )}
-
-      {/* Hostile Injection Callout Card (Scenario 3 Highlight) */}
-      {blockedNotice && (
-        <div className="mb-3 p-3.5 rounded-xl bg-red-950/80 border border-red-500/70 text-red-200 text-xs space-y-2 animate-in fade-in shadow-lg shadow-red-950/50">
-          <div className="flex items-center justify-between">
-            <span className="font-bold flex items-center gap-1.5 text-red-400 text-xs">
-              <ShieldAlert className="h-4 w-4 text-red-400" />
-              <span>Adversarial Prompt Injection Blocked</span>
-            </span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/40">
-              Gateway Firewall Slashed
-            </span>
-          </div>
-
-          <div className="bg-black/70 p-2.5 rounded-lg font-mono text-[11px] text-red-300 border border-red-900/60 leading-relaxed">
-            <span className="text-red-400 font-bold block mb-0.5">Intercepted Rogue Listing:</span>
-            <code className="text-red-200">{blockedNotice.hostilePayload}</code>
-          </div>
-
-          <div className="text-[11px] text-red-300/90 leading-normal">
-            <span className="font-semibold text-red-400">Policy Reason: </span>
-            <span>{blockedNotice.reason}</span>
-            {blockedNotice.merchant !== '—' && (
-              <span className="block mt-1 text-slate-400">
-                Target Merchant: <strong className="text-slate-200">{blockedNotice.merchant}</strong>
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Reasoning Trace Log Container */}
+      {/* Reasoning Trace Log: Timeline with subtle tints */}
       <div
         ref={traceContainerRef}
-        className="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-3 overflow-y-auto font-mono text-xs space-y-2 mb-3"
+        className="flex-1 bg-[#FAF9F5] border border-border rounded-md p-3 overflow-y-auto text-xs space-y-2 mb-3 min-h-0"
       >
         {trace.length === 0 && !isLoading && !errorMessage && !blockedNotice && (
-          <div className="h-full flex flex-col items-center justify-center text-slate-500">
-            <Bot className="h-8 w-8 mb-2 opacity-40" />
-            <p className="text-xs">Select a scenario preset or type a natural language shopping goal below.</p>
-            <p className="text-[10px] text-slate-600 mt-1">
-              E.g. "find me an ergonomic wireless mouse" or "Keychron mechanical keyboard"
+          <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-2">
+            <div className="p-3 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 mb-1 shadow-2xs">
+              <Bot className="h-6 w-6 stroke-[1.75]" />
+            </div>
+            <p className="text-xs font-semibold text-ink">Autonomous Planner Ready</p>
+            <p className="text-[11px] text-ink-muted max-w-xs">
+              Select a scenario preset above or type a natural shopping instruction below.
             </p>
           </div>
         )}
 
         {isLoading && (
-          <div className="flex items-center space-x-2 text-cyan-400 p-2.5 rounded-xl bg-cyan-950/20 border border-cyan-500/20 animate-pulse">
-            <Sparkles className="h-4 w-4 shrink-0" />
-            <span className="text-xs font-sans">
-              Cognitive Agent parsing goal, exploring merchant APIs, and composing intent...
-            </span>
+          <div className="flex items-center space-x-2 text-emerald-900 p-2.5 rounded-md bg-emerald-50 border border-emerald-200 shadow-2xs">
+            <span className="h-2 w-2 rounded-full bg-emerald-600 animate-ping"></span>
+            <span className="text-xs font-medium">Planning goal, exploring merchant catalogs, and composing intent...</span>
           </div>
         )}
 
-        {/* Color-Coded Trace Cards */}
+        {/* Timeline Trace Items */}
         {trace.map((step, idx) => {
           const isThought = step.type === 'THOUGHT';
           const isToolCall = step.type === 'TOOL_CALL';
@@ -327,67 +312,64 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
           const isRecovery = step.type === 'RECOVERY';
           const isGateway = step.type === 'GATEWAY_RESPONSE';
 
-          let cardBorder = 'border-slate-800/80 bg-slate-900/40';
-          let badgeColor = 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20';
-          let IconComponent = Brain;
+          let borderTint = 'border-l-3 border-l-border bg-surface';
+          let badgeStyle = 'badge-neutral';
+          let labelText = step.type;
 
           if (isThought) {
-            cardBorder = 'border-blue-500/25 bg-blue-950/20';
-            badgeColor = 'text-blue-400 bg-blue-500/10 border-blue-500/20';
-            IconComponent = Brain;
+            borderTint = 'border-l-3 border-l-sky-500 bg-sky-50/40 border-sky-100';
+            badgeStyle = 'badge-info';
+            labelText = 'Thought';
           } else if (isToolCall) {
-            cardBorder = 'border-amber-500/25 bg-amber-950/20';
-            badgeColor = 'text-amber-400 bg-amber-500/10 border-amber-500/20';
-            IconComponent = Terminal;
+            borderTint = 'border-l-3 border-l-amber-500 bg-amber-50/30 border-amber-100';
+            badgeStyle = 'badge-warning';
+            labelText = 'Tool Call';
           } else if (isToolResult) {
-            cardBorder = 'border-emerald-500/25 bg-emerald-950/20';
-            badgeColor = 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
-            IconComponent = CheckCircle2;
+            borderTint = 'border-l-3 border-l-emerald-500 bg-emerald-50/40 border-emerald-100';
+            badgeStyle = 'badge-success';
+            labelText = 'Tool Result';
           } else if (isRecovery) {
-            cardBorder = 'border-purple-500/40 bg-purple-950/30';
-            badgeColor = 'text-purple-300 bg-purple-500/15 border-purple-500/30';
-            IconComponent = RefreshCw;
+            borderTint = 'border-l-3 border-l-indigo-500 bg-indigo-50/40 border-indigo-100';
+            badgeStyle = 'badge-info';
+            labelText = 'Recovery';
           } else if (isGateway) {
-            cardBorder = 'border-cyan-500/30 bg-cyan-950/25';
-            badgeColor = 'text-cyan-300 bg-cyan-500/15 border-cyan-500/30';
-            IconComponent = ShieldCheck;
+            borderTint = 'border-l-3 border-l-accent bg-emerald-50/60 border-emerald-200';
+            badgeStyle = 'badge-success';
+            labelText = 'Gateway';
           }
 
           const hasPayload = step.payload && Object.keys(step.payload).length > 0;
           const isExpanded = !!expandedPayloads[idx];
 
           return (
-            <div key={idx} className={`p-2.5 rounded-xl border ${cardBorder} transition-all`}>
-              <div className="flex items-center justify-between mb-1.5 text-[10px]">
+            <div key={idx} className={`p-2.5 rounded border ${borderTint} text-xs shadow-2xs animate-in fade-in-50 slide-in-from-bottom-2 duration-300`}>
+              <div className="flex items-center justify-between mb-1 text-[11px]">
                 <div className="flex items-center gap-1.5">
-                  <span className={`px-2 py-0.5 rounded-md border font-bold flex items-center gap-1 ${badgeColor}`}>
-                    <IconComponent className="h-3 w-3 shrink-0" />
-                    <span>[{step.type}]</span>
-                  </span>
-                  <span className="text-slate-500 font-mono">Step #{step.step || idx + 1}</span>
+                  <span className={badgeStyle}>{labelText}</span>
+                  <span className="text-ink-muted font-mono text-[10px]">Step {step.step || idx + 1}</span>
                 </div>
-                <span className="text-slate-500">{formatTime(step.timestamp)}</span>
+                <span className="text-ink-muted text-[10px]">{formatTime(step.timestamp)}</span>
               </div>
 
-              <p className="text-slate-200 text-xs font-mono leading-relaxed whitespace-pre-wrap">
+              <p className="text-ink font-mono text-[11px] leading-relaxed whitespace-pre-wrap">
                 {step.content}
               </p>
 
               {/* Collapsible JSON Payload View */}
               {hasPayload && (
-                <div className="mt-2 pt-2 border-t border-slate-800/60">
+                <div className="mt-1.5 pt-1.5 border-t border-border/70">
                   <button
                     type="button"
                     onClick={() => togglePayload(idx)}
-                    className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-cyan-300 transition"
+                    className="flex items-center gap-1 text-[10px] text-ink-muted hover:text-ink transition"
                   >
-                    <Code2 className="h-3 w-3 text-cyan-400" />
-                    <span>{isExpanded ? 'Hide Payload' : 'View Payload JSON'}</span>
+                    <Code2 className="h-3 w-3 text-accent" />
+                    <span>{isExpanded ? 'Hide payload' : 'View payload JSON'}</span>
                     {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                   </button>
 
                   {isExpanded && (
-                    <div className="mt-1.5 p-2 rounded-lg bg-slate-950 border border-slate-800 text-[10px] text-cyan-300 overflow-x-auto max-h-40 leading-relaxed select-all">
+                    <div className="mt-1 code-box max-h-36 overflow-x-auto text-[10px] select-all bg-white border-border/80">
                       <pre>{JSON.stringify(step.payload, null, 2)}</pre>
                     </div>
                   )}
@@ -401,20 +383,20 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
       </div>
 
       {/* Goal Input & Dispatch Bar */}
-      <div className="flex space-x-2">
+      <div className="flex gap-2">
         <input
           type="text"
           value={goal}
           onChange={(e) => setGoal(e.target.value)}
-          placeholder="E.g. 'find me an ergonomic wireless mouse'..."
+          placeholder="E.g. 'Find me an ergonomic wireless mouse'..."
           disabled={isLoading}
-          className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-sans"
+          className="input-text flex-1 text-xs"
           onKeyDown={(e) => e.key === 'Enter' && executeGoal()}
         />
         <button
           onClick={() => executeGoal()}
           disabled={isLoading || !goal.trim()}
-          className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white px-4 py-2 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition shadow-md shadow-cyan-500/10 disabled:opacity-50"
+          className="btn-primary text-xs py-2 px-4 shadow-xs hover:-translate-y-0.5 active:scale-[0.96] transition-all"
         >
           <Send className="h-3.5 w-3.5" />
           <span>Dispatch</span>

@@ -7,7 +7,7 @@ import { LedgerTelemetryGrid } from './components/LedgerTelemetryGrid';
 import { BiometricModal } from './components/BiometricModal';
 import { CatalogDrawer } from './components/CatalogDrawer';
 import { ToastContainer } from './components/Toast';
-import { ShieldCheck, Cpu, Zap, Lock } from 'lucide-react';
+import { CustomCursor } from './components/CustomCursor';
 
 export const App: React.FC = () => {
   const [activeMandateId, setActiveMandateId] = useState<string>("mandate_active_001");
@@ -18,32 +18,31 @@ export const App: React.FC = () => {
   const [selectedGoal, setSelectedGoal] = useState<string>('');
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      <Navbar onOpenCatalog={() => setIsCatalogOpen(true)} />
+    <div className="min-h-screen bg-page text-ink flex flex-col font-sans">
+      <CustomCursor />
+      <Navbar onOpenCatalog={() => setIsCatalogOpen(true)} activeMandateId={activeMandateId} />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Top Architecture Banner */}
-        <div className="bg-gradient-to-r from-blue-900/40 via-slate-900 to-cyan-900/30 border border-blue-500/20 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        {/* Page Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3.5 border-b border-border gap-2">
           <div>
-            <h1 className="text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
-              <span>SafeAgent Core Operating Console</span>
-              <span className="text-xs font-mono font-normal bg-blue-500/20 text-cyan-300 px-2.5 py-0.5 rounded-full border border-cyan-500/30">
-                PayPal AI Hackathon
-              </span>
-            </h1>
-            <p className="text-xs text-slate-300 mt-1">
-              Untrusted Cognitive Agent (P2) decoupled from Deterministic Policy Gateway (P3) on PayPal Rails (P4).
+            <div className="flex items-center gap-2">
+              <h1 className="heading-page">Operating Console</h1>
+              <span className="h-2 w-2 rounded-full bg-accent inline-block"></span>
+            </div>
+            <p className="text-xs text-ink-muted mt-0.5">
+              Deterministic policy-guarded financial middleware decoupling AI agents from PayPal payment rails.
             </p>
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-mono text-slate-400 bg-slate-950/60 px-3 py-2 rounded-xl border border-slate-800">
-            <Lock className="h-4 w-4 text-cyan-400" />
-            <span>Active Mandate: <strong className="text-white">{activeMandateId}</strong></span>
+          <div className="flex items-center gap-2 text-xs font-mono bg-surface px-3 py-1.5 rounded-lg border border-emerald-200/80 shadow-2xs">
+            <span className="text-ink-muted">Mandate:</span>
+            <span className="font-semibold text-accent">{activeMandateId}</span>
           </div>
         </div>
 
-        {/* Main Grid: Mandate Manager & Agent Goal Chat */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Top Section: Mandate Manager & Agent Goal Chat */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           <div className="lg:col-span-5">
             <MandateManager
               activeMandateId={activeMandateId}
@@ -66,8 +65,10 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Real-time Financial Telemetry AG Grid */}
-        <LedgerTelemetryGrid blockedEvents={blockedEvents} />
+        {/* Centerpiece: Real-Time Financial Telemetry AG Grid */}
+        <div className="pt-2">
+          <LedgerTelemetryGrid blockedEvents={blockedEvents} />
+        </div>
       </main>
 
       {/* Whitelisted Merchant Catalog Drawer */}
@@ -80,26 +81,19 @@ export const App: React.FC = () => {
         }}
       />
 
-      {/* Tier 2 Biometric Confirmation Modal */}
+      {/* Biometric Passkey / Confirmation Modal */}
       {pendingIntent && (
         <BiometricModal
           intent={pendingIntent}
           onClose={() => setPendingIntent(null)}
           onConfirmed={() => setPendingIntent(null)}
-          onRejected={() => setPendingIntent(null)}
         />
       )}
 
-      {/* Global Network Error & Notification Toast Container */}
+      {/* Global Notifications Container */}
       <ToastContainer />
-
-      {/* Footer */}
-      <footer className="border-t border-slate-800/80 py-4 text-center text-xs text-slate-500">
-        SafeAgent Platform • Built for the PayPal AI Hackathon • NIST FIPS 204 Post-Quantum Mandates • AG Grid Telemetry
-      </footer>
     </div>
   );
 };
 
 export default App;
-

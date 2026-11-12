@@ -3,15 +3,12 @@ import {
   KeyRound,
   Shield,
   CheckCircle2,
-  Lock,
   Clock,
-  Coins,
   ChevronDown,
   ChevronUp,
   Plus,
   X,
-  Code2,
-  Sparkles
+  Code2
 } from 'lucide-react';
 import { ml_dsa65 } from '@noble/post-quantum/ml-dsa.js';
 import type { SpendingMandate } from '../../../shared/dist/index.js';
@@ -63,7 +60,7 @@ export const MandateManager: React.FC<MandateManagerProps> = ({
     if (propActiveMandateId && propActiveMandateId !== activeMandateId) {
       setActiveMandateId(propActiveMandateId);
     }
-  }, [propActiveMandateId]);
+  }, [propActiveMandateId, activeMandateId]);
 
   // Live countdown timer for active mandate expiration
   useEffect(() => {
@@ -86,14 +83,6 @@ export const MandateManager: React.FC<MandateManagerProps> = ({
     return () => clearInterval(interval);
   }, [activeExpiresAt]);
 
-  const toggleMerchant = (name: string) => {
-    if (whitelistedMerchants.includes(name)) {
-      setWhitelistedMerchants(whitelistedMerchants.filter((m) => m !== name));
-    } else {
-      setWhitelistedMerchants([...whitelistedMerchants, name]);
-    }
-  };
-
   const handleAddMerchant = () => {
     const trimmed = newMerchantInput.trim();
     if (!trimmed) return;
@@ -105,6 +94,10 @@ export const MandateManager: React.FC<MandateManagerProps> = ({
 
   const handleRemoveMerchant = (name: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (whitelistedMerchants.length <= 1) {
+      showToast({ type: 'warning', title: 'At least one merchant must be whitelisted' });
+      return;
+    }
     setWhitelistedMerchants(whitelistedMerchants.filter((m) => m !== name));
   };
 
@@ -200,224 +193,205 @@ export const MandateManager: React.FC<MandateManagerProps> = ({
   };
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
-      <div>
-        {/* Header with Active Gateway Badge */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-2.5">
-            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
-              <Lock className="h-5 w-5" />
-            </div>
-            <div>
-              <h2 className="font-bold text-lg text-white">Delegated Spending Mandate</h2>
-              <p className="text-xs text-slate-400">Post-Quantum Cryptographic Spend Constraints</p>
-            </div>
+    <div className="fintech-card p-5 sm:p-6 space-y-5">
+      {/* Document-Style Header */}
+      <div className="border-b border-border pb-4">
+        <div className="flex items-start justify-between">
+          <div>
+            <span className="eyebrow text-accent font-semibold tracking-wider">Client Delegation</span>
+            <h2 className="heading-section mt-0.5">Spending Mandate</h2>
+            <p className="text-xs text-ink-muted mt-0.5">
+              Cryptographically signed limits enforced deterministically by the gateway.
+            </p>
           </div>
-          <span className="text-xs font-mono px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
-            <CheckCircle2 className="h-3.5 w-3.5" /> Registered in Gateway
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>Active in gateway</span>
           </span>
         </div>
 
-        {/* Live Active Mandate Telemetry Pill (Remaining Balance & Expiry Countdown) */}
-        <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-slate-950 border border-slate-800/80 mb-5 text-xs">
+        {/* Polished Balance & Expiry Status Card */}
+        <div className="mt-3.5 grid grid-cols-2 gap-3 p-3.5 rounded-lg bg-gradient-to-r from-emerald-50/80 to-emerald-50/30 border border-emerald-200/80 shadow-2xs">
           <div>
-            <div className="flex items-center gap-1.5 text-slate-400 mb-0.5">
-              <Coins className="h-3.5 w-3.5 text-cyan-400" />
-              <span>Remaining Balance:</span>
-            </div>
-            <p className="font-mono text-sm font-bold text-white">
+            <span className="text-emerald-900/70 block text-[11px] font-medium">Remaining balance</span>
+            <span className="font-mono font-bold text-emerald-950 text-base leading-tight block mt-0.5">
               {formatCurrency(remainingBalance, MANDATE_CURRENCY)}
-            </p>
-          </div>
-
-          <div>
-            <div className="flex items-center gap-1.5 text-slate-400 mb-0.5">
-              <Clock className="h-3.5 w-3.5 text-amber-400" />
-              <span>Expiry TTL:</span>
-            </div>
-            <p className="font-mono text-sm font-bold text-amber-300">
-              {timeRemainingStr}
-            </p>
-          </div>
-        </div>
-
-        {/* Mandate Operating Currency Badge */}
-        <div className="flex items-center justify-between text-xs px-3 py-2 rounded-xl bg-slate-950/60 border border-slate-800/80 mb-5">
-          <div className="flex items-center gap-2">
-            <span className="text-slate-400">Operating Currency:</span>
-            <span className="font-mono font-bold text-white bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
-              {MANDATE_CURRENCY}
             </span>
           </div>
-          <span className="text-[11px] text-slate-400">Policy Guarded</span>
-        </div>
-
-        {/* Sliders: Max Spend & Tier 1 Limit */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
           <div>
-            <div className="flex justify-between items-center mb-1.5">
-              <label className="text-xs font-semibold text-slate-300">Max Spend Ceiling:</label>
-              <span className="text-blue-400 font-mono text-xs font-bold">
-                {formatCurrency(maxSpend, MANDATE_CURRENCY)}
-              </span>
-            </div>
-            <input
-              type="range"
-              min="1000"
-              max="50000"
-              step="500"
-              value={maxSpend}
-              onChange={(e) => setMaxSpend(parseFloat(e.target.value))}
-              className="w-full accent-blue-500 cursor-pointer"
-            />
-            <span className="text-[10px] text-slate-500">Hard stop ceiling. Intents above this are blocked.</span>
+            <span className="text-emerald-900/70 block text-[11px] font-medium flex items-center gap-1">
+              <Clock className="h-3 w-3 text-emerald-700/70" />
+              <span>Expires in</span>
+            </span>
+            <span className="font-mono font-semibold text-emerald-900 text-sm leading-tight block mt-1">
+              {timeRemainingStr}
+            </span>
           </div>
-
-          <div>
-            <div className="flex justify-between items-center mb-1.5">
-              <label className="text-xs font-semibold text-slate-300">Tier 1 Auto-Approve:</label>
-              <span className="text-emerald-400 font-mono text-xs font-bold">
-                {formatCurrency(tier1Limit, MANDATE_CURRENCY)}
-              </span>
-            </div>
-            <input
-              type="range"
-              min="500"
-              max="10000"
-              step="250"
-              value={tier1Limit}
-              onChange={(e) => setTier1Limit(parseFloat(e.target.value))}
-              className="w-full accent-emerald-500 cursor-pointer"
-            />
-            <span className="text-[10px] text-slate-500">Zero-touch micro-transactions under this auto-settle.</span>
-          </div>
-        </div>
-
-        {/* TTL Selector: 1h, 6h, 24h, 7d */}
-        <div className="mb-5">
-          <label className="block text-xs font-semibold text-slate-300 mb-2">
-            Expiration TTL (Time-To-Live Window)
-          </label>
-          <div className="grid grid-cols-4 gap-2">
-            {[
-              { label: '1 Hour', hours: 1 },
-              { label: '6 Hours', hours: 6 },
-              { label: '24 Hours', hours: 24 },
-              { label: '7 Days', hours: 168 }
-            ].map((preset) => (
-              <button
-                key={preset.hours}
-                type="button"
-                onClick={() => setTtlHours(preset.hours)}
-                className={`py-1.5 px-2 rounded-xl text-xs font-mono font-medium transition text-center border ${
-                  ttlHours === preset.hours
-                    ? 'bg-blue-600/25 border-blue-500 text-blue-300 shadow-sm'
-                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
-                }`}
-              >
-                {preset.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Editable Merchant Whitelist */}
-        <div className="mb-5">
-          <label className="block text-xs font-semibold text-slate-300 mb-2">
-            Merchant Whitelist ({whitelistedMerchants.length} Approved Stores)
-          </label>
-          <div className="flex flex-wrap gap-2 mb-2">
-            {whitelistedMerchants.map((merchant) => {
-              const isRogue = merchant.includes('Malicious') || merchant.includes('Dark');
-              return (
-                <span
-                  key={merchant}
-                  className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border font-medium ${
-                    isRogue
-                      ? 'bg-red-500/20 border-red-500/40 text-red-300'
-                      : 'bg-blue-600/20 border-blue-500/40 text-blue-300'
-                  }`}
-                >
-                  <span>{merchant}</span>
-                  <button
-                    type="button"
-                    onClick={(e) => handleRemoveMerchant(merchant, e)}
-                    className="hover:text-white text-slate-400 ml-0.5"
-                    title={`Remove ${merchant}`}
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              );
-            })}
-          </div>
-
-          {/* Add custom merchant */}
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newMerchantInput}
-              onChange={(e) => setNewMerchantInput(e.target.value)}
-              placeholder="Add merchant store (e.g. Reliance-Digital)..."
-              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddMerchant())}
-              className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-sans"
-            />
-            <button
-              type="button"
-              onClick={handleAddMerchant}
-              className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl px-3 py-1.5 text-xs flex items-center gap-1 transition"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              <span>Add</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Collapsible Canonical JSON Preview Box */}
-        <div className="mb-4">
-          <button
-            type="button"
-            onClick={() => setShowJsonPreview(!showJsonPreview)}
-            className="flex items-center justify-between w-full p-2 rounded-xl bg-slate-950/80 border border-slate-800 text-slate-400 hover:text-slate-200 text-xs transition"
-          >
-            <div className="flex items-center gap-1.5">
-              <Code2 className="h-3.5 w-3.5 text-cyan-400" />
-              <span>Canonical JSON Preview ({canonicalJsonPreview.length} bytes)</span>
-            </div>
-            {showJsonPreview ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </button>
-
-          {showJsonPreview && (
-            <div className="mt-2 p-3 rounded-xl bg-slate-950 border border-slate-800 text-[10px] font-mono text-cyan-300 overflow-x-auto max-h-36 leading-relaxed select-all">
-              <pre>{canonicalJsonPreview}</pre>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Footer Signing Action & Algorithm Badge */}
-      <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
-        <div className="text-xs text-slate-400 flex items-center gap-1.5">
-          <Shield className="h-4 w-4 text-cyan-400" />
-          <span>Algorithm: <strong className="text-cyan-400 font-mono">NIST FIPS 204 (ML-DSA-65)</strong></span>
+      {/* Sliders: Max Spend & Tier 1 Limit */}
+      <div className="space-y-4">
+        <div>
+          <div className="flex justify-between items-baseline mb-1.5">
+            <label className="text-xs font-medium text-ink">Max spend ceiling</label>
+            <span className="font-mono font-bold text-accent text-xs px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200 shadow-2xs">
+              {formatCurrency(maxSpend, MANDATE_CURRENCY)}
+            </span>
+          </div>
+          <input
+            type="range"
+            min="1000"
+            max="50000"
+            step="500"
+            value={maxSpend}
+            onChange={(e) => setMaxSpend(parseFloat(e.target.value))}
+            className="w-full accent-accent h-1.5 bg-stone-200 rounded-lg cursor-pointer"
+          />
+          <p className="text-[11px] text-ink-muted mt-1">Hard stop threshold. Intents exceeding this ceiling are rejected.</p>
         </div>
+
+        <div>
+          <div className="flex justify-between items-baseline mb-1.5">
+            <label className="text-xs font-medium text-ink">Tier 1 auto-approval limit</label>
+            <span className="font-mono font-bold text-accent text-xs px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200 shadow-2xs">
+              {formatCurrency(tier1Limit, MANDATE_CURRENCY)}
+            </span>
+          </div>
+          <input
+            type="range"
+            min="500"
+            max="10000"
+            step="250"
+            value={tier1Limit}
+            onChange={(e) => setTier1Limit(parseFloat(e.target.value))}
+            className="w-full accent-accent h-1.5 bg-stone-200 rounded-lg cursor-pointer"
+          />
+          <p className="text-[11px] text-ink-muted mt-1">Purchases below this amount settle automatically without human prompt.</p>
+        </div>
+      </div>
+
+      {/* TTL Segmented Control */}
+      <div>
+        <label className="text-xs font-medium text-ink block mb-1.5">
+          Mandate validity window (TTL)
+        </label>
+        <div className="grid grid-cols-4 gap-1 p-1 bg-stone-100/80 border border-border rounded-md text-xs font-medium">
+          {[
+            { label: '1 hour', hours: 1 },
+            { label: '6 hours', hours: 6 },
+            { label: '24 hours', hours: 24 },
+            { label: '7 days', hours: 168 }
+          ].map((preset) => (
+            <button
+              key={preset.hours}
+              type="button"
+              onClick={() => setTtlHours(preset.hours)}
+              className={`py-1.5 rounded text-center transition ${
+                ttlHours === preset.hours
+                  ? 'bg-accent text-white font-semibold shadow-xs'
+                  : 'text-ink-muted hover:text-ink hover:bg-surface/70'
+              }`}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Merchant Whitelist */}
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="text-xs font-medium text-ink">
+            Approved merchant whitelist ({whitelistedMerchants.length})
+          </label>
+          <span className="text-[11px] text-ink-muted font-mono">Currency: {MANDATE_CURRENCY}</span>
+        </div>
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {whitelistedMerchants.map((merchant) => (
+            <span
+              key={merchant}
+              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md bg-sky-50/80 border border-sky-200 text-sky-950 font-mono font-medium shadow-2xs"
+            >
+              <span>{merchant}</span>
+              <button
+                type="button"
+                onClick={(e) => handleRemoveMerchant(merchant, e)}
+                className="text-sky-600 hover:text-danger ml-0.5 transition"
+                title={`Remove ${merchant}`}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+
+        {/* Add custom merchant */}
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newMerchantInput}
+            onChange={(e) => setNewMerchantInput(e.target.value)}
+            placeholder="Add merchant (e.g. Reliance-Retail)..."
+            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddMerchant())}
+            className="input-text flex-1 text-xs"
+          />
+          <button
+            type="button"
+            onClick={handleAddMerchant}
+            className="btn-secondary text-xs px-3 hover:bg-sky-50 hover:border-sky-300 text-sky-900 font-medium"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>Add</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Collapsible Canonical JSON Preview Box */}
+      <div className="border-t border-border pt-3">
+        <button
+          type="button"
+          onClick={() => setShowJsonPreview(!showJsonPreview)}
+          className="flex items-center justify-between w-full text-xs text-ink-muted hover:text-ink transition"
+        >
+          <div className="flex items-center gap-1.5">
+            <Code2 className="h-3.5 w-3.5 text-accent" />
+            <span>Canonical JSON preview ({canonicalJsonPreview.length} bytes)</span>
+          </div>
+          {showJsonPreview ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+        </button>
+
+        {showJsonPreview && (
+          <div className="mt-2 code-box max-h-36 overflow-x-auto text-[11px] leading-relaxed select-all bg-[#FAF8F5] border-border/80">
+            <pre>{canonicalJsonPreview}</pre>
+          </div>
+        )}
+      </div>
+
+      {/* Action Footer: Issue & Sign Mandate */}
+      <div className="border-t border-border pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="text-[11px] text-ink-muted flex items-center gap-1.5">
+          <Shield className="h-3.5 w-3.5 text-accent" />
+          <span>Algorithm: <strong className="font-mono text-ink font-semibold">NIST FIPS 204 (ML-DSA-65)</strong></span>
+        </div>
+
         <button
           onClick={handleGenerateAndSign}
           disabled={isSigning}
-          className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-medium text-xs px-4 py-2 rounded-xl transition shadow-lg shadow-blue-500/20 disabled:opacity-50"
+          className="btn-primary w-full sm:w-auto shadow-xs text-xs py-2 px-4 hover:bg-accent-hover hover:-translate-y-0.5 active:scale-[0.97] transition-all"
         >
-          <KeyRound className="h-4 w-4" />
-          <span>{isSigning ? 'Signing Lattice...' : 'Issue & Sign Mandate'}</span>
+          <KeyRound className="h-3.5 w-3.5" />
+          <span>{isSigning ? 'Signing lattice...' : 'Issue & sign mandate'}</span>
         </button>
       </div>
 
       {/* Signature Proof Display */}
       {signatureHex && (
-        <div className="mt-4 p-3 rounded-xl bg-slate-950 border border-slate-800/80 font-mono text-[10px] text-slate-400 overflow-x-auto animate-in fade-in">
-          <p className="text-emerald-400 mb-1 flex items-center gap-1">
-            <CheckCircle2 className="h-3.5 w-3.5" /> Mandate Signed & Verified with Gateway:
-          </p>
-          <p className="truncate text-slate-400">Sig: {signatureHex.slice(0, 64)}...</p>
+        <div className="p-2.5 rounded-md bg-emerald-50/60 border border-emerald-200/80 text-[11px] font-mono text-emerald-950 shadow-2xs">
+          <span className="text-success font-semibold flex items-center gap-1 mb-0.5">
+            <CheckCircle2 className="h-3.5 w-3.5 text-success" /> Signed & registered with gateway
+          </span>
+          <p className="truncate text-emerald-900/80">Sig: {signatureHex.slice(0, 56)}...</p>
         </div>
       )}
     </div>

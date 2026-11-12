@@ -1,55 +1,63 @@
 import React from 'react';
-import { ShieldCheck, Cpu, CreditCard, ShoppingBag } from 'lucide-react';
+import { ShoppingBag, Shield } from 'lucide-react';
 
 interface NavbarProps {
   onOpenCatalog?: () => void;
+  activeMandateId?: string;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onOpenCatalog }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onOpenCatalog, activeMandateId }) => {
   return (
-    <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-40">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <header className="border-b border-border bg-page/95 backdrop-blur-xs sticky top-0 z-40">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-blue-700 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
-            <ShieldCheck className="h-6 w-6 text-white" />
+          <div className="h-8 w-8 rounded-md bg-accent text-white flex items-center justify-center shadow-xs border border-emerald-900/20">
+            <Shield className="h-4 w-4" />
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <span className="font-extrabold text-xl tracking-tight text-white">SafeAgent</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-mono border border-blue-500/20">v1.0-PQC</span>
+              <span className="font-serif text-lg font-bold tracking-tight text-ink">SafeAgent</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-mono font-semibold border border-indigo-200">
+                PQC v1.0
+              </span>
             </div>
-            <p className="text-xs text-slate-400">Deterministic Financial Middleware for Autonomous AI Agents</p>
+            <p className="text-[11px] text-ink-muted hidden sm:block">Financial middleware for autonomous agents</p>
           </div>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2.5">
+          {activeMandateId && (
+            <div className="hidden md:flex items-center space-x-1.5 text-xs text-ink-muted">
+              <span>Mandate:</span>
+              <span className="font-mono text-ink font-semibold px-2 py-0.5 rounded bg-surface border border-border">
+                {activeMandateId}
+              </span>
+            </div>
+          )}
+
+          <div className="hidden lg:flex items-center pl-2 border-l border-border">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#EBF5FB] text-[#00457C] border border-[#BDE0FE]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#0079C1]"></span>
+              PayPal Sandbox
+            </span>
+          </div>
+
+          <div className="flex items-center space-x-1.5 text-xs text-emerald-800 font-medium px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>Gateway online</span>
+          </div>
+
           <button
             onClick={onOpenCatalog}
-            className="flex items-center space-x-1.5 text-xs bg-slate-800 hover:bg-slate-700/80 text-cyan-300 hover:text-cyan-200 px-3 py-1.5 rounded-lg border border-slate-700 hover:border-cyan-500/40 transition cursor-pointer font-medium"
+            className="btn-secondary text-xs py-1 px-2.5 hover:border-accent/40 hover:text-accent transition"
             title="Inspect Whitelisted Merchant Catalogs (:4001/agent/catalog)"
           >
-            <ShoppingBag className="h-4 w-4 text-cyan-400" />
-            <span className="hidden sm:inline">Merchant Catalog</span>
+            <ShoppingBag className="h-3.5 w-3.5 text-accent" />
+            <span className="hidden sm:inline">Merchant catalog</span>
             <span className="sm:hidden">Catalog</span>
           </button>
-
-          <div className="hidden md:flex items-center space-x-2 text-xs bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700/60 text-slate-300">
-            <Cpu className="h-4 w-4 text-emerald-400" />
-            <span>Agent (P2): <strong className="text-emerald-400">Ready</strong></span>
-          </div>
-
-          <div className="hidden md:flex items-center space-x-2 text-xs bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700/60 text-slate-300">
-            <CreditCard className="h-4 w-4 text-blue-400" />
-            <span>PayPal Rails: <strong className="text-blue-400">Sandbox</strong></span>
-          </div>
-
-          <div className="flex items-center space-x-2 text-xs bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-lg border border-emerald-500/20 font-medium">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>Gateway Online</span>
-          </div>
         </div>
       </div>
     </header>
   );
 };
-
