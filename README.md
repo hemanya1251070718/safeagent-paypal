@@ -1,7 +1,7 @@
 # SafeAgent: Deterministic, Policy-Guarded Financial Middleware for Autonomous AI Agents
 
 > **Built for the PayPal AI Hackathon: *"Build What's Next with PayPal and AI"***  
-> **Target Tracks:** Grand Prize ($12,000) • Best Use of Agentic Commerce ($5,000) • Best Use of PayPal + AI ($5,000) • AG Grid Enterprise ($5,000) • Render ($1,000) • APIMatic ($1,000)
+
 
 [![Google Cloud Run](https://img.shields.io/badge/Google_Cloud_Run-Live_Demo-4285F4?style=for-the-badge&logo=googlecloud&logoColor=white)](https://safeagent-326279554484.asia-south1.run.app)
 [![PayPal Developer Sandbox](https://img.shields.io/badge/PayPal-Orders_v2_&_Vault-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://developer.paypal.com)
