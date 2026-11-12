@@ -1,4 +1,16 @@
-import { useReducedMotion as useMotionReducedMotion, type Variants, type Transition } from 'motion/react';
+import { useState, useEffect } from 'react';
+
+export type Transition = {
+  duration?: number;
+  ease?: readonly number[] | string;
+  delay?: number;
+  staggerChildren?: number;
+  delayChildren?: number;
+};
+
+export type Variants = {
+  [key: string]: any;
+};
 
 /**
  * Standard cubic-bezier ease-out curve for calm, crisp fintech transitions.
@@ -17,12 +29,23 @@ export const quickTransition: Transition = {
 };
 
 /**
- * Helper wrapper around motion/react's useReducedMotion hook.
  * Returns true if OS/browser requests reduced motion.
  */
 export const useReducedMotion = (): boolean => {
-  const shouldReduce = useMotionReducedMotion();
-  return Boolean(shouldReduce);
+  const [shouldReduce, setShouldReduce] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const handleChange = (e: MediaQueryListEvent) => setShouldReduce(e.matches);
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
+  return shouldReduce;
 };
 
 /**
