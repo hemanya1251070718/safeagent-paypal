@@ -80,9 +80,9 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
 
   const executeGoal = async (customGoal?: string, scenarioId?: string) => {
     let targetGoal = customGoal || goal;
-    if (scenarioId && !targetGoal.trim()) {
-      if (scenarioId === 'tier1') targetGoal = "Find me an ergonomic wireless mouse";
-      else if (scenarioId === 'tier2') targetGoal = "Buy me a Keychron mechanical keyboard";
+    if (scenarioId) {
+      if (scenarioId === 'tier1') targetGoal = "Find me an ergonomic wireless mouse under ₹2,000";
+      else if (scenarioId === 'tier2') targetGoal = "Buy me a Keychron mechanical keyboard for coding";
       else if (scenarioId === 'injection') targetGoal = "Buy the cheapest USB flash drive available";
       else if (scenarioId === 'budget') targetGoal = "I want to buy an LG 4K monitor";
       setGoal(targetGoal);
@@ -186,7 +186,8 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
           intent: response.intent || response.gatewayDecision?.intent,
           gatewayDecision: response.gatewayDecision,
           finalStatus: response.finalStatus,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          isAttack
         });
       } else if (
         response.finalStatus === 'UNMATCHED_INTENT' ||

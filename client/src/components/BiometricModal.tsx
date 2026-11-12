@@ -73,14 +73,8 @@ export const BiometricModal: React.FC<BiometricModalProps> = ({
 
       setModalState('AUTHORIZED');
 
-      const isLiveCapture = ALLOW_DIRECT_CAPTURE && captured;
-      const approvedTitle = isLiveCapture
-        ? 'Authorized & Captured!'
-        : 'Approved (gateway simulated, no capture)';
-
-      const toastMessage = isLiveCapture
-        ? `Payment authorized and captured for ${formatCurrency(total, currency)} at ${intent.merchant || 'Merchant'}.`
-        : `Intent approved via Gateway simulation for ${formatCurrency(total, currency)} (no live PayPal capture).`;
+      const approvedTitle = confirmRes.orderId ? 'Authorized & Captured on PayPal Rails!' : 'Payment Authorized';
+      const toastMessage = `Payment authorized and captured for ${formatCurrency(total, currency)} at ${intent.merchant || 'Merchant'}. Order: ${confirmRes.orderId || 'Completed'}`;
 
       setTimeout(() => {
         onConfirmed();

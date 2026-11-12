@@ -472,8 +472,8 @@ export function createPaymentsApp(deps: PaymentsAppDeps = {}) {
     broadcastSSE(replayEvt);
   }
 
-  // Create and capture order
-  app.post('/orders/create-and-capture', async (req, res) => {
+  // Create and capture order (supports both /orders and /orders/create-and-capture)
+  app.post(['/orders', '/orders/create-and-capture'], async (req, res) => {
     const validation = validateCheckoutIntent(req.body);
     if (!validation.valid) {
       return res.status(400).json({

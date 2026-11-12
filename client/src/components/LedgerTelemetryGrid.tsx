@@ -168,12 +168,22 @@ export const LedgerTelemetryGrid: React.FC<LedgerTelemetryGridProps> = ({ blocke
     const merchant = intent.merchant || 'Unapproved store';
     const intentId = intent.intentId || 'intent_blocked';
 
+    const isAttack = Boolean(
+      blocked.isAttack ||
+      blocked.gatewayDecision?.sanitizationAlerts?.length ||
+      (blocked.gatewayDecision?.reasons || []).some((r: string) => 
+        r.toLowerCase().includes('injection') || 
+        r.toLowerCase().includes('override') || 
+        r.toLowerCase().includes('rogue')
+      )
+    );
+
     return {
       id: `client_blk_${blocked.timestamp || Date.now()}_${intentId}`,
       index: nextIndex,
       timestamp: new Date(blocked.timestamp || Date.now()).toISOString(),
       formattedTime: formatTime(blocked.timestamp || Date.now()),
-      type: 'BLOCKED (client-observed)',
+      type: isAttack ? 'ATTACK BLOCKED' : 'CEILING REJECTED',
       referenceId: intentId,
       merchant,
       amount: total,
@@ -181,8 +191,8 @@ export const LedgerTelemetryGrid: React.FC<LedgerTelemetryGridProps> = ({ blocke
       tax: tax,
       formattedTax: tax !== null ? formatCurrency(tax, currency) : '—',
       currency,
-      tier: 'Tier 3 Block',
-      pqcStatus: 'Lattice Firebreak',
+      tier: isAttack ? 'Tier 3 Attack' : 'Tier 3 Ceil Exceeded',
+      pqcStatus: isAttack ? 'Lattice Firebreak' : 'Policy Guarded',
       hash: shortenHash(sha256Hex(JSON.stringify(blocked.gatewayDecision || blocked)), 10, 4),
       rawHash: '',
       isClientObserved: true,
