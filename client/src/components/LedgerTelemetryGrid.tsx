@@ -605,7 +605,7 @@ export const LedgerTelemetryGrid: React.FC<LedgerTelemetryGridProps> = ({ blocke
       </div>
 
       {/* AG Grid v33 High-Throughput Data Table */}
-      <div className="w-full h-84 rounded border border-border overflow-hidden">
+      <div className="w-full rounded border border-border overflow-hidden" style={{ height: '380px', width: '100%', minHeight: '380px' }}>
         <AgGridReact<LedgerTelemetryRow>
           theme={lightFintechTheme}
           rowData={rowData}

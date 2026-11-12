@@ -8,6 +8,7 @@ export interface SearchOptions {
 }
 
 const STOP_WORDS = new Set(["find", "me", "an", "a", "the", "for", "under", "with", "to", "buy", "by", "get", "give", "i", "want", "of", "in", "best", "cheap", "good", "some"]);
+const MODIFIER_WORDS = new Set(["pro", "max", "plus", "ultra", "mini", "lite", "gen", "edition", "series", "v2", "v3", "2nd", "3rd", "4th", "5th"]);
 
 export class StoreService {
   private products: MerchantProduct[] = [...CATALOG];
@@ -20,6 +21,9 @@ export class StoreService {
     // Filter out stop words and single-letter characters (e.g. 'x' in 'Puma x Collab')
     const keywords = rawKeywords.filter(k => !STOP_WORDS.has(k) && isNaN(Number(k)) && k.length > 1);
     const activeKeywords = keywords.length > 0 ? keywords : rawKeywords.filter(k => k.length > 1);
+
+    const substantiveKeywords = activeKeywords.filter(k => !MODIFIER_WORDS.has(k));
+    const requireSubstantiveMatch = substantiveKeywords.length > 0;
 
     const matched = this.products.map(product => {
       // Stock filter
@@ -50,6 +54,7 @@ export class StoreService {
       // STRICT GROUNDING: Must match on Name or Tags. Description-only occurrence (e.g. "charges laptops") is NOT a product match.
       let score = 0;
       let hasCoreMatch = false;
+      let hasSubstantiveMatch = false;
       const lowerName = product.name.toLowerCase();
       const lowerDesc = product.description.toLowerCase();
       const lowerTags = product.tags.map(t => t.toLowerCase());
@@ -62,17 +67,19 @@ export class StoreService {
         if (nameMatch) {
           score += 10;
           hasCoreMatch = true;
+          if (!MODIFIER_WORDS.has(kw)) hasSubstantiveMatch = true;
         }
         if (tagMatch) {
           score += 5;
           hasCoreMatch = true;
+          if (!MODIFIER_WORDS.has(kw)) hasSubstantiveMatch = true;
         }
         if (hasCoreMatch && wordRegex.test(lowerDesc)) {
           score += 1;
         }
       }
 
-      if (!hasCoreMatch) {
+      if (!hasCoreMatch || (requireSubstantiveMatch && !hasSubstantiveMatch)) {
         return { product, score: 0 };
       }
 

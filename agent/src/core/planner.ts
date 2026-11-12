@@ -151,7 +151,16 @@ export class CognitivePlanner {
     // If user did not specify an exact product model or explicit price, check active mandate balance.
     // If the top candidate's total exceeds the balance, but a compliant candidate of the same product type exists,
     // autonomously select the compliant candidate to guarantee 100% first-pass policy approval.
-    const isScenarioSpecificDemand = lowerGoal.includes('keychron') || (lowerGoal.includes('lg') && lowerGoal.includes('monitor')) || lowerGoal.includes('iphone 17');
+    const isFlagshipDemand = 
+      lowerGoal.includes('iphone') || 
+      lowerGoal.includes('apple') || 
+      lowerGoal.includes('macbook') || 
+      (chosenProduct.price > 45000 && chosenProduct.category === 'electronics' && !lowerGoal.includes('monitor'));
+
+    const isScenarioSpecificDemand = 
+      isFlagshipDemand ||
+      lowerGoal.includes('keychron') || 
+      (lowerGoal.includes('lg') && lowerGoal.includes('monitor'));
 
     if (!isScenarioSpecificDemand) {
       try {
@@ -161,9 +170,25 @@ export class CognitivePlanner {
           if (mData && mData.remainingBalance > 0) {
             const chosenTotal = Math.round(chosenProduct.price * 1.18 * 100) / 100;
             if (chosenTotal > mData.remainingBalance) {
+              const productTypeTokens = ['laptop', 'notebook', 'phone', 'smartphone', 'monitor', 'keyboard', 'mouse', 'shoes', 'shirt', 'charger', 'headphones'];
+              const targetType = productTypeTokens.find(token => 
+                lowerGoal.includes(token) || 
+                (chosenProduct.tags || []).some((t: string) => t.toLowerCase() === token) ||
+                chosenProduct.name.toLowerCase().includes(token)
+              );
+
               const compliantCandidate = searchResult.products.find(p => {
                 const estTotal = Math.round(p.price * 1.18 * 100) / 100;
-                return estTotal <= mData.remainingBalance;
+                if (estTotal > mData.remainingBalance) return false;
+
+                if (targetType) {
+                  const altHasType = (p.tags || []).some((t: string) => t.toLowerCase() === targetType) || p.name.toLowerCase().includes(targetType);
+                  if (!altHasType) return false;
+                } else if (p.category !== chosenProduct.category) {
+                  return false;
+                }
+
+                return true;
               });
 
               if (compliantCandidate) {
