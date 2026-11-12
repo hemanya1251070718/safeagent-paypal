@@ -158,12 +158,18 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
         });
       }
 
-      // Check for Biometric escalation
-      if (
+      // Check for Biometric escalation (Tier 2 Discretionary confirmation)
+      const isConfirmationRequired =
+        response.finalStatus === 'HELD_FOR_CONFIRMATION' ||
         response.finalStatus === 'PENDING_CONFIRMATION' ||
+        response.gatewayDecision?.status === 'HELD_FOR_CONFIRMATION' ||
+        response.gatewayDecision?.policyDecision === 'CONFIRMATION_REQUIRED' ||
         response.gatewayDecision?.policyDecision === 'ESCALATE_BIOMETRIC' ||
-        response.intent?.status === 'PENDING_CONFIRMATION'
-      ) {
+        response.gatewayDecision?.tier === 2 ||
+        response.intent?.status === 'PENDING_CONFIRMATION' ||
+        response.intent?.status === 'HELD_FOR_CONFIRMATION';
+
+      if (isConfirmationRequired) {
         const intentToConfirm = response.intent || response.gatewayDecision?.intent;
         if (intentToConfirm && onBiometricRequired) {
           onBiometricRequired(intentToConfirm);
