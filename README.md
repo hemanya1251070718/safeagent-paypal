@@ -16,7 +16,7 @@
 
 > [![SafeAgent Pitch & Live Demo Video](https://img.shields.io/badge/YouTube-Watch%20Pitch%20%26%20Live%20Demo%20(Under%203%20Min)-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](PASTE_YOUR_YOUTUBE_VIDEO_LINK_HERE)
 > 
-> 🔗 **YouTube Demo URL:** `PASTE_YOUR_YOUTUBE_VIDEO_LINK_HERE`  
+> 🔗 **YouTube Demo URL:** `https://youtu.be/Wgu2qej3Kl8
 > *(Walkthrough of natural language shopping reasoning, NIST ML-DSA mandate enforcement, WebAuthn biometric passkey approvals, real-time AG Grid telemetry, and PayPal Orders v2 sandbox capture).*
 
 ---
