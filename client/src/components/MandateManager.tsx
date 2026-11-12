@@ -13,7 +13,7 @@ import {
 import { ml_dsa65 } from '@noble/post-quantum/ml-dsa.js';
 import type { SpendingMandate } from '../../../shared/dist/index.js';
 import { bytesToHex, canonicalJsonStringify } from '../../../shared/dist/index.js';
-import { registerMandate } from '../services/api';
+import { registerMandate, getMandate } from '../services/api';
 import { formatCurrency } from '../utils/formatters';
 import { showToast } from './Toast';
 
@@ -23,11 +23,13 @@ const MANDATE_CURRENCY = 'INR';
 interface MandateManagerProps {
   onMandateUpdated: (mandateId: string, mandate?: SpendingMandate) => void;
   activeMandateId?: string;
+  refreshTrigger?: number;
 }
 
 export const MandateManager: React.FC<MandateManagerProps> = ({
   onMandateUpdated,
-  activeMandateId: propActiveMandateId
+  activeMandateId: propActiveMandateId,
+  refreshTrigger
 }) => {
   const [maxSpend, setMaxSpend] = useState<number>(15000.0);
   const [tier1Limit, setTier1Limit] = useState<number>(2500.0);
@@ -61,6 +63,34 @@ export const MandateManager: React.FC<MandateManagerProps> = ({
       setActiveMandateId(propActiveMandateId);
     }
   }, [propActiveMandateId, activeMandateId]);
+
+  // Synchronize live mandate state (remaining balance, limits, TTL) from Gateway
+  useEffect(() => {
+    let isSubscribed = true;
+    const syncMandate = async () => {
+      const targetId = propActiveMandateId || activeMandateId;
+      if (!targetId) return;
+      try {
+        const liveMandate = await getMandate(targetId);
+        if (isSubscribed && liveMandate) {
+          setRemainingBalance(liveMandate.remainingBalance);
+          setMaxSpend(liveMandate.maxSpend);
+          setTier1Limit(liveMandate.tier1Limit);
+          setActiveExpiresAt(liveMandate.expiresAt);
+          if (liveMandate.merchantWhitelist && liveMandate.merchantWhitelist.length > 0) {
+            setWhitelistedMerchants(liveMandate.merchantWhitelist);
+          }
+        }
+      } catch (err) {
+        console.warn(`Could not sync live balance for mandate ${targetId}:`, err);
+      }
+    };
+
+    syncMandate();
+    return () => {
+      isSubscribed = false;
+    };
+  }, [propActiveMandateId, activeMandateId, refreshTrigger]);
 
   // Live countdown timer for active mandate expiration
   useEffect(() => {
@@ -125,6 +155,33 @@ export const MandateManager: React.FC<MandateManagerProps> = ({
 
   // Cryptographic In-Browser ML-DSA-65 Signing Routine (DO NOT MODIFY)
   const handleGenerateAndSign = async () => {
+    if (!maxSpend || maxSpend <= 0) {
+      showToast({
+        type: 'error',
+        title: 'Invalid Spend Ceiling',
+        message: 'Please enter a valid Max Spend Ceiling greater than zero.'
+      });
+      return;
+    }
+
+    if (tier1Limit < 0) {
+      showToast({
+        type: 'error',
+        title: 'Invalid Tier 1 Threshold',
+        message: 'Tier 1 threshold must be non-negative.'
+      });
+      return;
+    }
+
+    if (tier1Limit > maxSpend) {
+      showToast({
+        type: 'error',
+        title: 'Threshold Exceeds Ceiling',
+        message: `Tier 1 auto-approve threshold (${formatCurrency(tier1Limit, MANDATE_CURRENCY)}) cannot exceed Max Spend ceiling (${formatCurrency(maxSpend, MANDATE_CURRENCY)}).`
+      });
+      return;
+    }
+
     setIsSigning(true);
     setStatus('GENERATING_PQC_KEYPAIR');
 
@@ -170,6 +227,11 @@ export const MandateManager: React.FC<MandateManagerProps> = ({
       setActiveMandateId(mandate.mandateId);
       setActiveExpiresAt(mandate.expiresAt);
       setRemainingBalance(mandate.remainingBalance);
+      try {
+        localStorage.setItem('safeagent_active_mandate_id', mandate.mandateId);
+      } catch (storageErr) {
+        console.warn('Could not persist active mandate to localStorage:', storageErr);
+      }
 
       showToast({
         type: 'success',
@@ -230,44 +292,120 @@ export const MandateManager: React.FC<MandateManagerProps> = ({
         </div>
       </div>
 
-      {/* Sliders: Max Spend & Tier 1 Limit */}
+      {/* Manual Tier Constraints & Numeric Inputs with Quick Presets */}
       <div className="space-y-4">
-        <div>
+        {/* Max Spend Ceiling Input (Tier 3 Hard Stop) */}
+        <div className="p-3.5 rounded-lg bg-page/50 border border-border">
           <div className="flex justify-between items-baseline mb-1.5">
-            <label className="text-xs font-medium text-ink">Max spend ceiling</label>
+            <label className="text-xs font-semibold text-ink flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-accent"></span>
+              <span>Max spend ceiling (Hard stop)</span>
+            </label>
             <span className="font-mono font-bold text-accent text-xs px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200 shadow-2xs">
               {formatCurrency(maxSpend, MANDATE_CURRENCY)}
             </span>
           </div>
-          <input
-            type="range"
-            min="1000"
-            max="50000"
-            step="500"
-            value={maxSpend}
-            onChange={(e) => setMaxSpend(parseFloat(e.target.value))}
-            className="w-full accent-accent h-1.5 bg-stone-200 rounded-lg cursor-pointer"
-          />
-          <p className="text-[11px] text-ink-muted mt-1">Hard stop threshold. Intents exceeding this ceiling are rejected.</p>
+          <div className="relative flex items-center mb-2">
+            <span className="absolute left-3 text-ink-muted font-mono text-xs font-semibold">{MANDATE_CURRENCY}</span>
+            <input
+              type="number"
+              min="500"
+              max="1000000"
+              step="500"
+              value={maxSpend === 0 ? '' : maxSpend}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value);
+                setMaxSpend(isNaN(val) ? 0 : val);
+              }}
+              placeholder="Enter max spend limit (e.g. 50000)"
+              className="input-text w-full pl-12 pr-3 py-1.5 font-mono text-xs"
+            />
+          </div>
+          {/* Quick preset buttons */}
+          <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+            <span className="text-[10px] text-ink-muted mr-1">Presets:</span>
+            {[15000, 30000, 50000, 100000, 200000].map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => setMaxSpend(preset)}
+                className={`text-[10px] font-mono px-2 py-0.5 rounded border transition ${
+                  maxSpend === preset
+                    ? 'bg-accent text-white border-accent font-semibold shadow-xs'
+                    : 'bg-surface border-border text-ink-muted hover:text-ink hover:bg-stone-50'
+                }`}
+              >
+                {(preset / 1000).toFixed(0)}k
+              </button>
+            ))}
+          </div>
+          <span className="text-[10px] text-ink-muted block leading-tight">
+            Tier 3 Hard Stop threshold: Any intent exceeding this ceiling is deterministically rejected.
+          </span>
         </div>
 
-        <div>
+        {/* Tier 1 Auto-Approve Limit Input */}
+        <div className="p-3.5 rounded-lg bg-page/50 border border-border">
           <div className="flex justify-between items-baseline mb-1.5">
-            <label className="text-xs font-medium text-ink">Tier 1 auto-approval limit</label>
+            <label className="text-xs font-semibold text-ink flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+              <span>Tier 1 auto-approval threshold</span>
+            </label>
             <span className="font-mono font-bold text-accent text-xs px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200 shadow-2xs">
               {formatCurrency(tier1Limit, MANDATE_CURRENCY)}
             </span>
           </div>
-          <input
-            type="range"
-            min="500"
-            max="10000"
-            step="250"
-            value={tier1Limit}
-            onChange={(e) => setTier1Limit(parseFloat(e.target.value))}
-            className="w-full accent-accent h-1.5 bg-stone-200 rounded-lg cursor-pointer"
-          />
-          <p className="text-[11px] text-ink-muted mt-1">Purchases below this amount settle automatically without human prompt.</p>
+          <div className="relative flex items-center mb-2">
+            <span className="absolute left-3 text-ink-muted font-mono text-xs font-semibold">{MANDATE_CURRENCY}</span>
+            <input
+              type="number"
+              min="0"
+              max={maxSpend > 0 ? maxSpend : 50000}
+              step="250"
+              value={tier1Limit === 0 ? '' : tier1Limit}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value);
+                setTier1Limit(isNaN(val) ? 0 : val);
+              }}
+              placeholder="Enter micro-spend threshold (e.g. 2500)"
+              className="input-text w-full pl-12 pr-3 py-1.5 font-mono text-xs"
+            />
+          </div>
+          {/* Quick preset buttons */}
+          <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+            <span className="text-[10px] text-ink-muted mr-1">Presets:</span>
+            {[1000, 2500, 5000, 6500, 10000].map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => setTier1Limit(preset)}
+                className={`text-[10px] font-mono px-2 py-0.5 rounded border transition ${
+                  tier1Limit === preset
+                    ? 'bg-accent text-white border-accent font-semibold shadow-xs'
+                    : 'bg-surface border-border text-ink-muted hover:text-ink hover:bg-stone-50'
+                }`}
+              >
+                {preset >= 1000 ? `${(preset / 1000).toFixed(preset % 1000 === 0 ? 0 : 1)}k` : preset}
+              </button>
+            ))}
+          </div>
+          <span className="text-[10px] text-ink-muted block leading-tight">
+            Zero-touch micro-transactions at or under this amount auto-settle without human prompt.
+          </span>
+        </div>
+
+        {/* Tier 2 Discretionary Range Banner */}
+        <div className="px-3.5 py-2.5 rounded-lg bg-amber-50/80 border border-amber-200/90 flex items-center justify-between text-xs shadow-2xs">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+            <span className="text-amber-900 font-semibold">Tier 2 Discretionary:</span>
+            <span className="font-mono text-ink">
+              &gt; {formatCurrency(tier1Limit, MANDATE_CURRENCY)} up to {formatCurrency(maxSpend, MANDATE_CURRENCY)}
+            </span>
+          </div>
+          <span className="badge-warning font-mono text-[10px]">
+            1-Tap Biometric Required
+          </span>
         </div>
       </div>
 

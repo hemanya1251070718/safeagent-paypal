@@ -7,7 +7,8 @@ import {
   Code2,
   ChevronDown,
   ChevronUp,
-  Bot
+  Bot,
+  AlertCircle
 } from 'lucide-react';
 import { dispatchPlan, triggerScenario } from '../services/api';
 import { formatTime } from '../utils/formatters';
@@ -17,13 +18,15 @@ interface AgentGoalChatProps {
   externalGoal?: string;
   onBiometricRequired?: (intent: any) => void;
   onIntentBlocked?: (blockedEvent: any) => void;
+  onOrderCaptured?: () => void;
 }
 
 export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
   mandateId,
   externalGoal,
   onBiometricRequired,
-  onIntentBlocked
+  onIntentBlocked,
+  onOrderCaptured
 }) => {
   const [goal, setGoal] = useState<string>('');
   const [trace, setTrace] = useState<any[]>([]);
@@ -35,6 +38,11 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
     reason: string;
     hostilePayload: string;
     merchant: string;
+    isAttack?: boolean;
+  } | null>(null);
+  const [unmatchedNotice, setUnmatchedNotice] = useState<{
+    goal: string;
+    reason?: string;
   } | null>(null);
 
   const traceContainerRef = useRef<HTMLDivElement>(null);
@@ -52,7 +60,7 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
     if (traceBottomRef.current) {
       traceBottomRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [trace, isLoading, blockedNotice]);
+  }, [trace, isLoading, blockedNotice, unmatchedNotice]);
 
   const togglePayload = (stepIdx: number) => {
     setExpandedPayloads((prev) => ({
@@ -66,18 +74,27 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
     setFinalStatus(null);
     setErrorMessage(null);
     setBlockedNotice(null);
+    setUnmatchedNotice(null);
     setExpandedPayloads({});
   };
 
   const executeGoal = async (customGoal?: string, scenarioId?: string) => {
-    const targetGoal = customGoal || goal;
-    if (!targetGoal.trim()) return;
+    let targetGoal = customGoal || goal;
+    if (scenarioId && !targetGoal.trim()) {
+      if (scenarioId === 'tier1') targetGoal = "Find me an ergonomic wireless mouse";
+      else if (scenarioId === 'tier2') targetGoal = "Buy me a Keychron mechanical keyboard";
+      else if (scenarioId === 'injection') targetGoal = "Buy the cheapest USB flash drive available";
+      else if (scenarioId === 'budget') targetGoal = "I want to buy an LG 4K monitor";
+      setGoal(targetGoal);
+    }
+    if (!targetGoal.trim() && !scenarioId) return;
 
     setIsLoading(true);
     setTrace([]);
     setFinalStatus(null);
     setErrorMessage(null);
     setBlockedNotice(null);
+    setUnmatchedNotice(null);
     setExpandedPayloads({});
 
     try {
@@ -91,15 +108,24 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
       setTrace(response.trace || []);
       setFinalStatus(response.finalStatus || 'COMPLETE');
 
-      // Check if Scenario 3 / hostile injection was triggered
-      const isHostile =
+      // Check if Scenario 3 / hostile injection or spend ceiling block was triggered
+      const isSanitizationAlert = (response.gatewayDecision?.sanitizationAlerts?.length || 0) > 0;
+      const isExplicitInjection =
         scenarioId === 'injection' ||
-        response.finalStatus === 'REJECTED_BY_GATEWAY' ||
         response.gatewayDecision?.policyDecision === 'BLOCKED' ||
-        response.gatewayDecision?.sanitizationAlerts?.length > 0;
+        (response.gatewayDecision?.reasons || []).some((r: string) =>
+          r.toLowerCase().includes('injection') ||
+          r.toLowerCase().includes('override') ||
+          r.toLowerCase().includes('rogue')
+        );
+      const isAttack = isSanitizationAlert || isExplicitInjection;
+      const isPolicyBlocked =
+        isAttack ||
+        response.finalStatus === 'REJECTED_BY_GATEWAY' ||
+        response.gatewayDecision?.policyDecision === 'REJECTED';
 
-      if (isHostile) {
-        // Find hostile item payload from response intent, gatewayDecision, or trace
+      if (isPolicyBlocked) {
+        // Find item payload from response intent, gatewayDecision, or trace
         const tracePayloadItem = response.trace
           ?.map((t: any) => t.payload?.item || t.payload?.items?.[0])
           ?.find((i: any) => i && (i.description || i.name));
@@ -111,24 +137,24 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
             i.name?.includes('ROGUE') ||
             i.description?.includes('OVERRIDE')
           ) ||
+          response.intent?.items?.[0] ||
           response.gatewayDecision?.intent?.items?.[0] ||
           tracePayloadItem;
 
-        const reason =
+        const payloadText = hostileItem?.description || (hostileItem ? `${hostileItem.name || hostileItem.id}${hostileItem.quantity ? ` (Qty: ${hostileItem.quantity})` : ''}` : null);
+        const reasonText =
+          response.gatewayDecision?.reasons?.join('; ') ||
           response.gatewayDecision?.reason ||
           response.gatewayDecision?.sanitizationAlerts?.[0] ||
           response.reason ||
-          'Policy violation: untrusted seller instruction injection detected in product catalog listing.';
-
-        const listingText =
-          hostileItem?.description ||
-          hostileItem?.name ||
-          (response.rawPayload ? JSON.stringify(response.rawPayload) : null);
+          'Policy spend limit or constraint violated.';
+        const merchantText = hostileItem?.merchant || response.intent?.merchant || '—';
 
         setBlockedNotice({
-          reason: reason,
-          hostilePayload: listingText || 'Blocked by gateway (payload details unavailable)',
-          merchant: hostileItem?.merchant || response.intent?.merchant || '—'
+          reason: reasonText,
+          hostilePayload: payloadText || 'Blocked by gateway (payload details unavailable)',
+          merchant: merchantText,
+          isAttack
         });
       }
 
@@ -156,6 +182,20 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
           finalStatus: response.finalStatus,
           timestamp: Date.now()
         });
+      } else if (
+        response.finalStatus === 'UNMATCHED_INTENT' ||
+        response.finalStatus === 'NO_PRODUCTS_FOUND'
+      ) {
+        setUnmatchedNotice({
+          goal: targetGoal,
+          reason: response.error || 'Requested item is not available in approved merchant inventories.'
+        });
+      } else if (
+        response.finalStatus === 'ACCEPTED_AND_CAPTURED' ||
+        response.gatewayDecision?.status === 'ACCEPTED_AND_CAPTURED' ||
+        response.gatewayDecision?.policyDecision === 'APPROVED'
+      ) {
+        onOrderCaptured?.();
       }
     } catch (err: any) {
       console.error('Agent execution error:', err);
@@ -251,19 +291,23 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
           </div>
         )}
 
-        {/* Serious Hostile Injection Callout Card */}
+        {/* Policy / Injection Blocked Callout Card */}
         {blockedNotice && (
           <div className="mb-3 p-3.5 rounded-lg bg-rose-50/80 border-l-4 border-danger border border-rose-200 text-xs space-y-2 shadow-2xs">
             <div className="flex items-center justify-between">
               <span className="font-bold flex items-center gap-1.5 text-danger">
                 <ShieldAlert className="h-4 w-4" />
-                <span>Adversarial Prompt Injection Blocked</span>
+                <span>{blockedNotice.isAttack ? "Adversarial Prompt Injection Blocked" : "Mandate Spend Ceiling Exceeded"}</span>
               </span>
-              <span className="badge-danger font-mono text-[10px]">Policy Firebreak</span>
+              <span className="badge-danger font-mono text-[10px]">
+                {blockedNotice.isAttack ? "Policy Firebreak" : "Deterministic Hard Stop"}
+              </span>
             </div>
 
             <div className="code-box bg-white p-2 text-[11px] leading-relaxed border-rose-200">
-              <span className="text-danger font-semibold block mb-0.5">Intercepted listing payload:</span>
+              <span className="text-danger font-semibold block mb-0.5">
+                {blockedNotice.isAttack ? "Intercepted listing payload:" : "Blocked intent cart:"}
+              </span>
               <code>{blockedNotice.hostilePayload}</code>
             </div>
 
@@ -278,6 +322,25 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
             </div>
           </div>
         )}
+
+        {/* Unmatched Intent / Relevance Floor Callout Card */}
+        {unmatchedNotice && (
+          <div className="mb-3 p-3.5 rounded-lg bg-amber-50/80 border-l-4 border-amber-500 border border-amber-200 text-xs space-y-1.5 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <span className="font-bold flex items-center gap-1.5 text-amber-900 text-xs">
+                <AlertCircle className="h-4 w-4 text-amber-600" />
+                <span>Shopping Intent Unmatched (Zero Funds Captured)</span>
+              </span>
+              <span className="badge-warning font-mono text-[10px]">
+                Relevance Guardrail
+              </span>
+            </div>
+
+            <div className="text-[11px] text-amber-950 leading-relaxed">
+              No verified items matching <strong className="text-ink">"{unmatchedNotice.goal}"</strong> were found in approved merchant stores. SafeAgent halted cart execution to protect your wallet from unintended purchases.
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Reasoning Trace Log: Timeline with subtle tints */}
@@ -285,7 +348,7 @@ export const AgentGoalChat: React.FC<AgentGoalChatProps> = ({
         ref={traceContainerRef}
         className="flex-1 bg-[#FAF9F5] border border-border rounded-md p-3 overflow-y-auto text-xs space-y-2 mb-3 min-h-0"
       >
-        {trace.length === 0 && !isLoading && !errorMessage && !blockedNotice && (
+        {trace.length === 0 && !isLoading && !errorMessage && !blockedNotice && !unmatchedNotice && (
           <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-2">
             <div className="p-3 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 mb-1 shadow-2xs">
               <Bot className="h-6 w-6 stroke-[1.75]" />

@@ -7,7 +7,7 @@ export interface SearchOptions {
   includeOutOfStock?: boolean;
 }
 
-const STOP_WORDS = new Set(["find", "me", "an", "a", "the", "for", "under", "with", "to", "buy", "i", "want", "of", "in", "best", "cheap", "good", "some"]);
+const STOP_WORDS = new Set(["find", "me", "an", "a", "the", "for", "under", "with", "to", "buy", "by", "get", "give", "i", "want", "of", "in", "best", "cheap", "good", "some"]);
 
 export class StoreService {
   private products: MerchantProduct[] = [...CATALOG];
@@ -17,9 +17,9 @@ export class StoreService {
     // Sanitize punctuation so searches like "Puma Velocity NITRO 3 (₹7,499, Myntra)" parse cleanly
     const sanitizedQuery = q.replace(/[\(\)\[\]\{\}",'₹\$]/g, ' ');
     const rawKeywords = sanitizedQuery.split(/\s+/).filter(k => k.length > 0);
-    // Filter out stop words unless all keywords are stop words
-    const keywords = rawKeywords.filter(k => !STOP_WORDS.has(k) && isNaN(Number(k)));
-    const activeKeywords = keywords.length > 0 ? keywords : rawKeywords;
+    // Filter out stop words and single-letter characters (e.g. 'x' in 'Puma x Collab')
+    const keywords = rawKeywords.filter(k => !STOP_WORDS.has(k) && isNaN(Number(k)) && k.length > 1);
+    const activeKeywords = keywords.length > 0 ? keywords : rawKeywords.filter(k => k.length > 1);
 
     const matched = this.products.map(product => {
       // Stock filter
@@ -46,16 +46,34 @@ export class StoreService {
         return { product, score: 1 };
       }
 
-      // Score relevance: Title matches = 10 pts, Tag matches = 5 pts, Description matches = 2 pts
+      // Score relevance: Title matches = 10 pts, Tag matches = 5 pts, Description matches = 1 bonus pt
+      // STRICT GROUNDING: Must match on Name or Tags. Description-only occurrence (e.g. "charges laptops") is NOT a product match.
       let score = 0;
+      let hasCoreMatch = false;
       const lowerName = product.name.toLowerCase();
       const lowerDesc = product.description.toLowerCase();
       const lowerTags = product.tags.map(t => t.toLowerCase());
 
       for (const kw of activeKeywords) {
-        if (lowerName.includes(kw)) score += 10;
-        if (lowerTags.some(t => t.includes(kw))) score += 5;
-        if (lowerDesc.includes(kw)) score += 2;
+        const wordRegex = new RegExp(`\\b${kw}`, 'i');
+        const nameMatch = wordRegex.test(lowerName);
+        const tagMatch = lowerTags.some(t => t === kw || t.startsWith(kw));
+
+        if (nameMatch) {
+          score += 10;
+          hasCoreMatch = true;
+        }
+        if (tagMatch) {
+          score += 5;
+          hasCoreMatch = true;
+        }
+        if (hasCoreMatch && wordRegex.test(lowerDesc)) {
+          score += 1;
+        }
+      }
+
+      if (!hasCoreMatch) {
+        return { product, score: 0 };
       }
 
       return { product, score };
@@ -70,117 +88,7 @@ export class StoreService {
     });
 
     const results = matched.map(m => m.product);
-
-    // If we found direct matches in catalog, return them
-    if (results.length >= 3) {
-      return results.slice(0, 6);
-    }
-
-    // Dynamic Product Synthesizer: If catalog has 0 or few items, supplement with verified brand listings
-    if (activeKeywords.length > 0) {
-      const needed = Math.max(1, 5 - results.length);
-      const dynamicProducts = this.synthesizeDynamicProducts(query, options, needed);
-      for (const dp of dynamicProducts) {
-        if (!results.some(r => r.name.toLowerCase() === dp.name.toLowerCase())) {
-          this.products.push(dp);
-          results.push(dp);
-        }
-      }
-    }
-
     return results.slice(0, 6);
-  }
-
-  private synthesizeDynamicProducts(query: string, options: SearchOptions, count: number = 5): MerchantProduct[] {
-    const q = query.toLowerCase();
-    const cleanTokens = query
-      .replace(/\b(find|me|an?|the|brand|new|buy|cheap|best|under|rs\.?|inr|\$)\b/gi, ' ')
-      .replace(/[\(\)\[\]\{\}",'₹]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim() || query;
-    const baseNoun = cleanTokens.split(/\s+/).filter(w => w.length > 0).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || "Product";
-
-    const merchants = ["Amazon-India", "Flipkart", "Croma-Retail", "Myntra", "Shopify-India"];
-    
-    // Brand archetypes based on domain
-    let brandTier: { brands: string[]; category: 'electronics' | 'office' | 'accessories' | 'hardware'; defaultBudget: number } = {
-      brands: ["Premium Choice", "Urban Trend", "Pro Series", "Classic Select", "Value Smart"],
-      category: 'accessories',
-      defaultBudget: 2999
-    };
-
-    if (q.includes("phone") || q.includes("mobile") || q.includes("smartphone")) {
-      brandTier = {
-        brands: ["OnePlus", "Samsung", "Nothing", "Redmi", "Realme"],
-        category: 'electronics',
-        defaultBudget: 24999
-      };
-    } else if (q.includes("underpants") || q.includes("underwear") || q.includes("boxer") || q.includes("brief")) {
-      brandTier = {
-        brands: ["Jockey", "Calvin Klein", "Van Heusen", "U.S. Polo Assn.", "Hanes"],
-        category: 'accessories',
-        defaultBudget: 1199
-      };
-    } else if (q.includes("shoe") || q.includes("sneaker") || q.includes("boot") || q.includes("sandal")) {
-      brandTier = {
-        brands: ["Nike", "Adidas", "Puma", "Woodland", "Skechers"],
-        category: 'accessories',
-        defaultBudget: 4999
-      };
-    } else if (q.includes("shirt") || q.includes("tshirt") || q.includes("pant") || q.includes("jean") || q.includes("cloth")) {
-      brandTier = {
-        brands: ["Levi's", "Zara", "Tommy Hilfiger", "H&M", "Jack & Jones"],
-        category: 'accessories',
-        defaultBudget: 2499
-      };
-    } else if (q.includes("headphone") || q.includes("earbud") || q.includes("audio") || q.includes("speaker")) {
-      brandTier = {
-        brands: ["Sony", "boAt", "JBL", "Sennheiser", "Noise"],
-        category: 'accessories',
-        defaultBudget: 2999
-      };
-    } else if (q.includes("laptop") || q.includes("computer") || q.includes("macbook")) {
-      brandTier = {
-        brands: ["Apple MacBook", "Dell Inspiron", "HP Pavilion", "Lenovo ThinkPad", "ASUS ZenBook"],
-        category: 'hardware',
-        defaultBudget: 59999
-      };
-    } else if (q.includes("watch") || q.includes("smartwatch")) {
-      brandTier = {
-        brands: ["Apple Watch", "Samsung Galaxy Watch", "Fossil Gen 6", "Noise ColorFit", "Fire-Boltt"],
-        category: 'accessories',
-        defaultBudget: 4999
-      };
-    }
-
-    const maxBudget = options.maxPrice && options.maxPrice > 0 ? options.maxPrice : brandTier.defaultBudget;
-    const synthList: MerchantProduct[] = [];
-
-    for (let i = 0; i < count; i++) {
-      const brand = brandTier.brands[i % brandTier.brands.length];
-      const merchant = merchants[i % merchants.length];
-      
-      // Calculate realistic distributed price points under the max budget
-      const priceFactor = 0.65 + (i * 0.08); // 65%, 73%, 81%, 89%, 97% of budget
-      const calculatedPrice = Math.max(299, Math.round((maxBudget * priceFactor) / 10) * 10 - 1); // e.g. ₹24,999, ₹21,999
-
-      const hashStr = Math.abs((query + brand + merchant).split('').reduce((acc, char) => (acc << 5) - acc + char.charCodeAt(0), 0)).toString(36).toUpperCase().substring(0, 8);
-      const prodId = `DYN-${hashStr}`;
-
-      synthList.push({
-        id: prodId,
-        merchant,
-        name: `${brand} ${baseNoun} Edition`,
-        category: brandTier.category,
-        price: calculatedPrice,
-        currency: "INR",
-        inStock: true,
-        description: `${brand} ${baseNoun} with official brand warranty, available via verified merchant partner ${merchant}.`,
-        tags: [query.toLowerCase(), brand.toLowerCase(), baseNoun.toLowerCase()]
-      });
-    }
-
-    return synthList;
   }
 
   public getById(productId: string): MerchantProduct | undefined {

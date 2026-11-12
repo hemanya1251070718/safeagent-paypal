@@ -195,7 +195,8 @@ export class SemanticSearchService {
         }
       }
 
-      if (score > 0.05) {
+      const threshold = engine === 'gemini-embedding' ? 0.65 : 0.20;
+      if (score > threshold) {
         scored.push({ product, score, engine });
       }
     }

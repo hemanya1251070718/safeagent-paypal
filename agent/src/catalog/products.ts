@@ -81,6 +81,17 @@ export const CATALOG: MerchantProduct[] = [
     tags: ["monitor", "1080p", "display", "dell", "budget", "screen"]
   },
   {
+    id: "TECH-107",
+    merchant: "Amazon-India",
+    name: "Zebronics 21.5-inch 75Hz Full HD IPS Monitor",
+    category: "electronics",
+    price: 4899,
+    currency: "INR",
+    inStock: true,
+    description: "FHD 1920x1080 LED display with HDMI and VGA ports, built-in stereo speakers.",
+    tags: ["monitor", "display", "budget", "screen", "zebronics", "1080p"]
+  },
+  {
     id: "SONY-55",
     merchant: "Croma-Retail",
     name: "Sony Bravia 55-inch 4K Ultra HD Smart OLED TV",
@@ -101,6 +112,50 @@ export const CATALOG: MerchantProduct[] = [
     inStock: true,
     description: "Apple M3 8-core CPU, 10-core GPU, Liquid Retina Display with True Tone, 18 hours battery life.",
     tags: ["laptop", "macbook", "apple", "m3", "notebook", "computer"]
+  },
+  {
+    id: "ACER-ASP3",
+    merchant: "Amazon-India",
+    name: "Acer Aspire 3 15.6-inch Intel Celeron N4500 Thin Laptop",
+    category: "hardware",
+    price: 23990,
+    currency: "INR",
+    inStock: true,
+    description: "Intel Celeron N4500 Dual-Core Processor, 8GB DDR4 RAM, 256GB NVMe SSD, Windows 11 Home, Pure Silver, 1.7 Kg.",
+    tags: ["laptop", "acer", "aspire", "computer", "notebook", "budget", "windows"]
+  },
+  {
+    id: "LENO-IP3",
+    merchant: "Amazon-India",
+    name: "Lenovo IdeaPad Slim 3 15.6-inch FHD Thin & Light Laptop",
+    category: "hardware",
+    price: 34990,
+    currency: "INR",
+    inStock: true,
+    description: "Intel Core i3 12th Gen, 8GB RAM, 512GB SSD, Windows 11, Arctic Grey, 1.63Kg.",
+    tags: ["laptop", "lenovo", "ideapad", "computer", "notebook", "office", "windows"]
+  },
+  {
+    id: "HP-15S",
+    merchant: "Flipkart",
+    name: "HP 15s AMD Ryzen 5 Hexa Core 16GB RAM 512GB SSD Laptop",
+    category: "hardware",
+    price: 44990,
+    currency: "INR",
+    inStock: true,
+    description: "AMD Ryzen 5 5500U processor, 15.6-inch FHD micro-edge display, fast charge, natural silver.",
+    tags: ["laptop", "hp", "ryzen", "computer", "notebook", "work", "windows"]
+  },
+  {
+    id: "ASUS-VIVO",
+    merchant: "Croma-Retail",
+    name: "ASUS Vivobook 15 Intel Core i5 16GB RAM 512GB SSD Laptop",
+    category: "hardware",
+    price: 49990,
+    currency: "INR",
+    inStock: true,
+    description: "15.6-inch FHD anti-glare display, 180-degree lay-flat hinge, fingerprint scanner, quiet blue.",
+    tags: ["laptop", "asus", "vivobook", "computer", "notebook", "windows"]
   },
   {
     id: "SONY-XM5",
